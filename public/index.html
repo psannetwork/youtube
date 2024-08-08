@@ -9,6 +9,17 @@
   <body>
     <div class="container">
       <h1>YouTube Downloader</h1>
+      
+      <p>
+        このツールを使用して、YouTubeの動画を簡単にダウンロードできます。以下の手順で操作してください：
+        <ol>
+          <li>YouTubeの動画URLを入力してください。</li>
+          <li>希望するフォーマット（MP4またはMP3）を選択してください。</li>
+          <li>「Download」ボタンをクリックして、ダウンロードを開始します。</li>
+        </ol>
+        ダウンロードが開始されると、ファイルが自動的に保存されます。
+      </p>
+
       <form id="download-form">
         <label for="url">YouTube URL:</label>
         <input
@@ -20,10 +31,12 @@
         />
 
         <div>
-          <label
-            ><input type="radio" name="format" value="mp4" checked /> MP4</label
-          >
-          <label><input type="radio" name="format" value="mp3" /> MP3</label>
+          <label>
+            <input type="radio" name="format" value="mp4" checked /> MP4
+          </label>
+          <label>
+            <input type="radio" name="format" value="mp3" /> MP3
+          </label>
         </div>
 
         <button type="submit" id="download-button">Download</button>
