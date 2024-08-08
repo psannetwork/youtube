@@ -3,23 +3,18 @@ const youtubedl = require("youtube-dl-exec");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const urlModule = require("url");
 const rateLimit = require("express-rate-limit");
 const app = express();
 const port = 3000;
-
 const cors = require("cors");
+
 app.use(cors());
-
 app.use(express.json());
-
-// Static files
 app.use(express.static(path.join(__dirname, "public")));
 
-// Rate limiter middleware to prevent DDoS attacks
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: "Too many requests from this IP, please try again later.",
 });
 app.use(limiter);
@@ -27,7 +22,18 @@ app.use(limiter);
 function cleanYouTubeUrl(url) {
   try {
     const parsedUrl = new URL(url);
-    const videoId = parsedUrl.searchParams.get("v");
+    let videoId = null;
+
+    if (parsedUrl.hostname === "youtu.be") {
+      videoId = parsedUrl.pathname.slice(1);
+    } else if (
+      parsedUrl.hostname === "www.youtube.com" ||
+      parsedUrl.hostname === "youtube.com" ||
+      parsedUrl.hostname === "m.youtube.com"
+    ) {
+      videoId = parsedUrl.searchParams.get("v");
+    }
+
     return videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
   } catch (error) {
     return null;
@@ -121,6 +127,7 @@ app.get("/mp3", async (req, res) => {
 
     await youtubedl(cleanUrl, {
       output: tempFilePath,
+      extractAudio: true,
       audioFormat: "mp3",
       noCheckCertificates: true,
       noWarnings: true,
