@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Bit:wght@400;700&display=swap');
+
+body {
+    font-family: 'Bit', Arial, sans-serif;
+    background-color: #121212;
+    color: #ffffff;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+h1 {
+    text-align: center;
+    color: #ff6600; 
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    margin-bottom: 10px;
+    color: #ff6600;
+}
+
+input[type="text"] {
+    padding: 10px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background-color: #222;
+    color: #fff;
+    margin-bottom: 20px;
+}
+
+button {
+    padding: 10px;
+    background-color: #ff6600;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+    font-family: 'Bit', Arial, sans-serif;
+}
+
+button:disabled {
+    background-color: #6c757d;
+}
+
+button:hover {
+    background-color: #e65c00; 
+}
+
+.hidden {
+    display: none;
+}
+
+#result {
+    text-align: center;
+    margin-top: 20px;
+    color: #ff6600;
+}
