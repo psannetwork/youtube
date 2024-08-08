@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const urlModule = require("url");
+const rateLimit = require("express-rate-limit");
 const app = express();
 const port = 3000;
 
@@ -12,13 +13,25 @@ app.use(cors());
 
 app.use(express.json());
 
+// Static files
 app.use(express.static(path.join(__dirname, "public")));
 
-function cleanYouTubeUrl(url) {
-  const parsedUrl = new URL(url);
-  const videoId = parsedUrl.searchParams.get("v");
+// Rate limiter middleware to prevent DDoS attacks
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again later.",
+});
+app.use(limiter);
 
-  return videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
+function cleanYouTubeUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+    const videoId = parsedUrl.searchParams.get("v");
+    return videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 function generateRandomFileName(extension) {
