@@ -2,6 +2,10 @@ Clone this repository
 
 ```https://github.com/hirotomoki12345/youtube.git```
 
+Enter the directory
+
+```cd youtube```
+
 Run this Command
 
 ```npm i```
