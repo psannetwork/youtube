@@ -1,6 +1,6 @@
 Clone this repository
 
-```https://github.com/hirotomoki12345/youtube.git```
+```git clone https://github.com/hirotomoki12345/youtube.git```
 
 Enter the directory
 
