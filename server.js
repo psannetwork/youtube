@@ -5,7 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const app = express();
-const port = 3010;
+const port = 3020;
 const cors = require("cors");
 
 app.use(cors());
