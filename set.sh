@@ -21,7 +21,7 @@ if [ "$CHOICE" == "1" ]; then
     cd youtube
     npm install
     pm2 start npm --name "youtube-app" -- start 
-    echo "Application started on port 3010."
+    echo "Application started on port 3020."
     cd -
 
 elif [ "$CHOICE" == "2" ]; then
