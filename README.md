@@ -17,4 +17,6 @@ Run this Command
 
 or
 
-```curl -Ls https://raw.githubusercontent.com/hirotomoki12345/youtube/main/set.sh | bash```
+```curl -Ls https://raw.githubusercontent.com/hirotomoki12345/youtube/main/set.sh -o set.sh```
+
+```bash ./set.sh```
