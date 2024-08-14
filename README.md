@@ -13,3 +13,8 @@ Run this Command
 ```npm install youtube-dl-exec --save```
 
 ```npm start```
+
+
+or
+
+```curl -Ls https://raw.githubusercontent.com/hirotomoki12345/youtube/main/set.sh | bash```
