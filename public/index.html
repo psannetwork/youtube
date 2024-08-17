@@ -9,16 +9,15 @@
   <body>
     <div class="container">
       <h1>YouTube Downloader</h1>
-      
       <p>
         このツールを使用して、YouTubeの動画を簡単にダウンロードできます。以下の手順で操作してください：
-        <ol>
-          <li>YouTubeの動画URLを入力してください。</li>
-          <li>希望するフォーマット（MP4またはMP3）を選択してください。</li>
-          <li>「Download」ボタンをクリックして、ダウンロードを開始します。</li>
-        </ol>
-        ダウンロードが開始されると、ファイルが自動的に保存されます。
       </p>
+      <ol>
+        <li>YouTubeの動画URLを入力してください。</li>
+        <li>希望するフォーマット（MP4またはMP3）を選択してください。</li>
+        <li>「Download」ボタンをクリックして、ダウンロードを開始します。</li>
+      </ol>
+      <p>ダウンロードが開始されると、ファイルが自動的に保存されます。</p>
 
       <form id="download-form">
         <label for="url">YouTube URL:</label>
@@ -34,15 +33,73 @@
           <label>
             <input type="radio" name="format" value="mp4" checked /> MP4
           </label>
-          <label>
-            <input type="radio" name="format" value="mp3" /> MP3
-          </label>
+          <label> <input type="radio" name="format" value="mp3" /> MP3 </label>
         </div>
 
         <button type="submit" id="download-button">Download</button>
       </form>
-      <a id="file-link" href="#" download class="hidden">Download your file</a>
     </div>
+
+    <div class="api-usage">
+      <h1>APIの使い方</h1>
+
+      <div class="api-endpoint">
+        <h3>MP4エンドポイント</h3>
+        <p>URL: <code>/mp4?url={Your video URL here}</code></p>
+        <div class="code-container">
+          <code>
+            fetch('/mp4?url=YOUR_VIDEO_URL') .then(response => response.blob())
+            .then(blob => { const url = window.URL.createObjectURL(blob); const
+            a = document.createElement('a'); a.style.display = 'none'; a.href =
+            url; a.download = 'video.mp4'; document.body.appendChild(a);
+            a.click(); window.URL.revokeObjectURL(url); }) .catch(error =>
+            console.error('Error:', error));
+          </code>
+          <button class="copy-button" onclick="copyToClipboard(this)">
+            コピー
+          </button>
+        </div>
+      </div>
+
+      <div class="api-endpoint">
+        <h3>MP3エンドポイント</h3>
+        <p>URL: <code>/mp3?url={Your video URL here}</code></p>
+        <div class="code-container">
+          <code>
+            fetch('/mp3?url=YOUR_VIDEO_URL') .then(response => response.blob())
+            .then(blob => { const url = window.URL.createObjectURL(blob); const
+            a = document.createElement('a'); a.style.display = 'none'; a.href =
+            url; a.download = 'audio.mp3'; document.body.appendChild(a);
+            a.click(); window.URL.revokeObjectURL(url); }) .catch(error =>
+            console.error('Error:', error));
+          </code>
+          <button class="copy-button" onclick="copyToClipboard(this)">
+            コピー
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="main.js"></script>
+    <script>
+      function copyToClipboard(button) {
+        const codeElement = button.previousElementSibling;
+        const range = document.createRange();
+        range.selectNode(codeElement);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+
+        try {
+          document.execCommand("copy");
+          button.textContent = "コピー完了";
+          setTimeout(() => (button.textContent = "コピー"), 1500);
+        } catch (err) {
+          console.error("コピーに失敗しました:", err);
+        }
+
+        window.getSelection().removeAllRanges();
+      }
+    </script>
+    <a id="file-link" href="#" download class="hidden">Download your file</a>
   </body>
 </html>
