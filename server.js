@@ -4,9 +4,10 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
+const cors = require("cors");
+
 const app = express();
 const port = 3020;
-const cors = require("cors");
 
 app.use(cors());
 app.use(express.json());
@@ -88,6 +89,7 @@ app.get("/mp4", async (req, res) => {
 
     await youtubedl(cleanUrl, {
       output: tempFilePath,
+      format: "mp4", // Explicitly specify MP4 format
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
@@ -128,7 +130,7 @@ app.get("/mp3", async (req, res) => {
     await youtubedl(cleanUrl, {
       output: tempFilePath,
       extractAudio: true,
-      audioFormat: "mp3",
+      audioFormat: "mp3", // Specify MP3 format for audio extraction
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
