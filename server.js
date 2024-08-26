@@ -124,33 +124,57 @@ app.get("/mp3", async (req, res) => {
   }
 
   try {
-    const fileName = generateRandomFileName(".mp3");
-    const tempFilePath = path.join(__dirname, fileName);
+    // Step 1: Download the video as MP4
+    const mp4FileName = generateRandomFileName(".mp4");
+    const mp4FilePath = path.join(__dirname, mp4FileName);
 
     await youtubedl(cleanUrl, {
-      output: tempFilePath,
-      extractAudio: true,
-      audioFormat: "mp3", // Specify MP3 format for audio extraction
+      output: mp4FilePath,
+      format: "mp4",
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
     });
 
-    res.download(tempFilePath, (err) => {
-      if (err) {
+    // Step 2: Convert MP4 to MP3
+    const mp3FileName = generateRandomFileName(".mp3");
+    const mp3FilePath = path.join(__dirname, mp3FileName);
+
+    const ffmpeg = require("fluent-ffmpeg");
+    ffmpeg(mp4FilePath)
+      .toFormat("mp3")
+      .on("end", () => {
+        // Send MP3 file as download
+        res.download(mp3FilePath, (err) => {
+          if (err) {
+            console.error(err);
+            res.status(500).json({ error: "ダウンロード中にエラーが発生しました" });
+          } else {
+            // Clean up files
+            fs.unlink(mp4FilePath, (err) => {
+              if (err) console.error(err);
+            });
+            fs.unlink(mp3FilePath, (err) => {
+              if (err) console.error(err);
+            });
+          }
+        });
+      })
+      .on("error", (err) => {
         console.error(err);
-        res.status(500).json({ error: "ダウンロード中にエラーが発生しました" });
-      } else {
-        fs.unlink(tempFilePath, (err) => {
+        res.status(500).json({ error: "エラーが発生しました" });
+        fs.unlink(mp4FilePath, (err) => {
           if (err) console.error(err);
         });
-      }
-    });
+      })
+      .save(mp3FilePath);
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "エラーが発生しました" });
   }
 });
+
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
