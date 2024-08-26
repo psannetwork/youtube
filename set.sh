@@ -17,6 +17,7 @@ echo "4) View application logs"
 read -p "Enter your choice: " CHOICE
 
 if [ "$CHOICE" == "1" ]; then
+    sudo apt install ffmpeg
     git clone https://github.com/hirotomoki12345/youtube.git
     cd youtube
     npm install
