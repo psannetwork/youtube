@@ -24,6 +24,11 @@ if [ "$CHOICE" == "1" ]; then
     echo "Application started on port 3020."
     cd -
 
+    # Save the PM2 process list and configure PM2 to start on boot
+    pm2 save
+    pm2 startup
+    echo "PM2 startup script has been configured. Your application will start automatically on boot."
+
 elif [ "$CHOICE" == "2" ]; then
     pm2 stop "youtube-app"
     pm2 delete "youtube-app"
