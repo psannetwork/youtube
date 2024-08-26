@@ -5,6 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const cors = require("cors");
+const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
 const port = 3020;
@@ -43,6 +44,17 @@ function cleanYouTubeUrl(url) {
 
 function generateRandomFileName(extension) {
   return crypto.randomBytes(5).toString("hex") + extension;
+}
+
+function cleanupFiles(filePaths) {
+  return Promise.all(filePaths.map(filePath =>
+    new Promise((resolve, reject) => {
+      fs.unlink(filePath, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    })
+  ));
 }
 
 app.get("/video-info", async (req, res) => {
@@ -89,7 +101,7 @@ app.get("/mp4", async (req, res) => {
 
     await youtubedl(cleanUrl, {
       output: tempFilePath,
-      format: "mp4", // Explicitly specify MP4 format
+      format: "mp4",
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
@@ -100,9 +112,7 @@ app.get("/mp4", async (req, res) => {
         console.error(err);
         res.status(500).json({ error: "ダウンロード中にエラーが発生しました" });
       } else {
-        fs.unlink(tempFilePath, (err) => {
-          if (err) console.error(err);
-        });
+        cleanupFiles([tempFilePath]).catch(console.error);
       }
     });
   } catch (error) {
@@ -123,11 +133,13 @@ app.get("/mp3", async (req, res) => {
     return res.status(400).json({ error: "無効なYouTube URLです" });
   }
 
-  try {
-    // Step 1: Download the video as MP4
-    const mp4FileName = generateRandomFileName(".mp4");
-    const mp4FilePath = path.join(__dirname, mp4FileName);
+  const mp4FileName = generateRandomFileName(".mp4");
+  const mp4FilePath = path.join(__dirname, mp4FileName);
 
+  const mp3FileName = generateRandomFileName(".mp3");
+  const mp3FilePath = path.join(__dirname, mp3FileName);
+
+  try {
     await youtubedl(cleanUrl, {
       output: mp4FilePath,
       format: "mp4",
@@ -136,45 +148,38 @@ app.get("/mp3", async (req, res) => {
       preferFreeFormats: true,
     });
 
-    // Step 2: Convert MP4 to MP3
-    const mp3FileName = generateRandomFileName(".mp3");
-    const mp3FilePath = path.join(__dirname, mp3FileName);
-
     const ffmpeg = require("fluent-ffmpeg");
     ffmpeg(mp4FilePath)
+      .setFfmpegPath(ffmpegPath)
       .toFormat("mp3")
-      .on("end", () => {
-        // Send MP3 file as download
-        res.download(mp3FilePath, (err) => {
-          if (err) {
-            console.error(err);
-            res.status(500).json({ error: "ダウンロード中にエラーが発生しました" });
-          } else {
-            // Clean up files
-            fs.unlink(mp4FilePath, (err) => {
-              if (err) console.error(err);
+      .on("end", async () => {
+        try {
+          await new Promise((resolve, reject) => {
+            res.download(mp3FilePath, (err) => {
+              if (err) return reject(err);
+              resolve();
             });
-            fs.unlink(mp3FilePath, (err) => {
-              if (err) console.error(err);
-            });
-          }
-        });
+          });
+          await cleanupFiles([mp4FilePath, mp3FilePath]);
+        } catch (err) {
+          console.error(err);
+          res.status(500).json({ error: "ダウンロード中にエラーが発生しました" });
+          await cleanupFiles([mp4FilePath, mp3FilePath]);
+        }
       })
-      .on("error", (err) => {
+      .on("error", async (err) => {
         console.error(err);
         res.status(500).json({ error: "エラーが発生しました" });
-        fs.unlink(mp4FilePath, (err) => {
-          if (err) console.error(err);
-        });
+        await cleanupFiles([mp4FilePath, mp3FilePath]);
       })
       .save(mp3FilePath);
 
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "エラーが発生しました" });
+    await cleanupFiles([mp4FilePath, mp3FilePath]);
   }
 });
-
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
