@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const cors = require("cors");
 const ffmpegPath = require('ffmpeg-static');
+const { exec } = require("child_process");
 
 const app = express();
 const port = 3020;
@@ -57,6 +58,7 @@ function cleanupFiles(filePaths) {
   ));
 }
 
+// 非同期で動画情報を取得
 app.get("/video-info", async (req, res) => {
   const url = req.query.url;
 
@@ -83,6 +85,7 @@ app.get("/video-info", async (req, res) => {
   }
 });
 
+// MP4のダウンロードエンドポイント
 app.get("/mp4", async (req, res) => {
   const url = req.query.url;
 
@@ -99,7 +102,7 @@ app.get("/mp4", async (req, res) => {
     const fileName = generateRandomFileName(".mp4");
     const tempFilePath = path.join(__dirname, fileName);
 
-    await youtubedl(cleanUrl, {
+    const process = youtubedl.exec(cleanUrl, {
       output: tempFilePath,
       format: "mp4",
       noCheckCertificates: true,
@@ -107,12 +110,18 @@ app.get("/mp4", async (req, res) => {
       preferFreeFormats: true,
     });
 
-    res.download(tempFilePath, (err) => {
-      if (err) {
-        console.error(err);
-        res.status(500).json({ error: "ダウンロード中にエラーが発生しました" });
+    process.on('close', async (code) => {
+      if (code === 0) {
+        res.download(tempFilePath, async (err) => {
+          if (err) {
+            console.error(err);
+            res.status(500).json({ error: "ダウンロード中にエラーが発生しました" });
+          } else {
+            await cleanupFiles([tempFilePath]);
+          }
+        });
       } else {
-        cleanupFiles([tempFilePath]).catch(console.error);
+        res.status(500).json({ error: "動画ダウンロードに失敗しました" });
       }
     });
   } catch (error) {
@@ -121,6 +130,7 @@ app.get("/mp4", async (req, res) => {
   }
 });
 
+// MP3のダウンロードエンドポイント
 app.get("/mp3", async (req, res) => {
   const url = req.query.url;
 
