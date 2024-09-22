@@ -38,68 +38,11 @@
 
         <button type="submit" id="download-button">Download</button>
       </form>
+
+      <div id="status-message"></div>
     </div>
 
-    <div class="api-usage">
-      <h1>APIの使い方</h1>
-
-      <div class="api-endpoint">
-        <h3>MP4エンドポイント</h3>
-        <p>URL: <code>/mp4?url={Your video URL here}</code></p>
-        <div class="code-container">
-          <code>
-            fetch('/mp4?url=YOUR_VIDEO_URL') .then(response => response.blob())
-            .then(blob => { const url = window.URL.createObjectURL(blob); const
-            a = document.createElement('a'); a.style.display = 'none'; a.href =
-            url; a.download = 'video.mp4'; document.body.appendChild(a);
-            a.click(); window.URL.revokeObjectURL(url); }) .catch(error =>
-            console.error('Error:', error));
-          </code>
-          <button class="copy-button" onclick="copyToClipboard(this)">
-            コピー
-          </button>
-        </div>
-      </div>
-
-      <div class="api-endpoint">
-        <h3>MP3エンドポイント</h3>
-        <p>URL: <code>/mp3?url={Your video URL here}</code></p>
-        <div class="code-container">
-          <code>
-            fetch('/mp3?url=YOUR_VIDEO_URL') .then(response => response.blob())
-            .then(blob => { const url = window.URL.createObjectURL(blob); const
-            a = document.createElement('a'); a.style.display = 'none'; a.href =
-            url; a.download = 'audio.mp3'; document.body.appendChild(a);
-            a.click(); window.URL.revokeObjectURL(url); }) .catch(error =>
-            console.error('Error:', error));
-          </code>
-          <button class="copy-button" onclick="copyToClipboard(this)">
-            コピー
-          </button>
-        </div>
-      </div>
-    </div>
-
+    <!-- 外部JavaScriptファイルの読み込み -->
     <script src="main.js"></script>
-    <script>
-      function copyToClipboard(button) {
-        const codeElement = button.previousElementSibling;
-        const range = document.createRange();
-        range.selectNode(codeElement);
-        window.getSelection().removeAllRanges();
-        window.getSelection().addRange(range);
-
-        try {
-          document.execCommand("copy");
-          button.textContent = "コピー完了";
-          setTimeout(() => (button.textContent = "コピー"), 1500);
-        } catch (err) {
-          console.error("コピーに失敗しました:", err);
-        }
-
-        window.getSelection().removeAllRanges();
-      }
-    </script>
-    <a id="file-link" href="#" download class="hidden">Download your file</a>
   </body>
 </html>
