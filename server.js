@@ -58,7 +58,7 @@ function cleanupFiles(filePaths) {
   ));
 }
 
-// 非同期で動画情報を取得
+
 app.get("/video-info", async (req, res) => {
   const url = req.query.url;
 
@@ -85,7 +85,6 @@ app.get("/video-info", async (req, res) => {
   }
 });
 
-// MP4のダウンロードエンドポイント
 app.get("/mp4", async (req, res) => {
   const url = req.query.url;
 
@@ -130,7 +129,6 @@ app.get("/mp4", async (req, res) => {
   }
 });
 
-// MP3のダウンロードエンドポイント
 app.get("/mp3", async (req, res) => {
   const url = req.query.url;
 
