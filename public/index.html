@@ -1,48 +1,42 @@
 <!doctype html>
 <html lang="ja">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>YouTube Downloader</title>
     <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
+</head>
+<body>
     <div class="container">
-      <h1>YouTube Downloader</h1>
-      <p>
-        このツールを使用して、YouTubeの動画を簡単にダウンロードできます。以下の手順で操作してください：
-      </p>
-      <ol>
-        <li>YouTubeの動画URLを入力してください。</li>
-        <li>希望するフォーマット（MP4またはMP3）を選択してください。</li>
-        <li>「Download」ボタンをクリックして、ダウンロードを開始します。</li>
-      </ol>
-      <p>ダウンロードが開始されると、ファイルが自動的に保存されます。</p>
+        <h1>YouTube Downloader</h1>
+        <p>このツールを使用して、YouTubeの動画を簡単にダウンロードできます。以下の手順で操作してください：</p>
+        <ol>
+            <li>YouTubeの動画URLを入力してください。</li>
+            <li>希望するフォーマット（MP4、MP3、またはWEBM）を選択してください。</li>
+            <li>「Download」ボタンをクリックして、ダウンロードを開始します。</li>
+        </ol>
+        <p>ダウンロードが開始されると、ファイルが自動的に保存されます。</p>
 
-      <form id="download-form">
-        <label for="url">YouTube URL:</label>
-        <input
-          type="text"
-          id="url"
-          name="url"
-          placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
-          required
-        />
+        <form id="download-form">
+            <label for="url">YouTube URL:</label>
+            <input type="text" id="url" name="url" placeholder="https://www.youtube.com/watch?v=VIDEO_ID" required />
+            <div>
+                <label>
+                    <input type="radio" name="format" value="mp4" checked /> MP4
+                </label>
+                <label>
+                    <input type="radio" name="format" value="mp3" /> MP3
+                </label>
+                <label>
+                    <input type="radio" name="format" value="webm" /> WEBM
+                </label>
+            </div>
+            <button type="submit" id="download-button">Download</button>
+        </form>
 
-        <div>
-          <label>
-            <input type="radio" name="format" value="mp4" checked /> MP4
-          </label>
-          <label> <input type="radio" name="format" value="mp3" /> MP3 </label>
-        </div>
-
-        <button type="submit" id="download-button">Download</button>
-      </form>
-
-      <div id="status-message"></div>
+        <div id="status-message"></div>
     </div>
 
-    <!-- 外部JavaScriptファイルの読み込み -->
     <script src="main.js"></script>
-  </body>
+</body>
 </html>
