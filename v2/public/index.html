@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube ダウンローダー</title>
+</head>
+<body>
+    <input type="text" id="url" placeholder="YouTube URLを入力">
+    <select id="format">
+        <option value="mp4">MP4</option>
+        <option value="mp3">MP3</option>
+        <option value="mov">MOV</option>
+    </select>
+    <button id="downloadBtn">ダウンロード開始</button>
+    <p id="status"></p>
+    <a id="downloadLink" style="display: none;" download>ファイルをダウンロード</a>
+
+    <script>
+        document.getElementById("downloadBtn").addEventListener("click", async () => {
+            const url = document.getElementById("url").value;
+            const format = document.getElementById("format").value;
+            document.getElementById("status").textContent = "ダウンロード中…";
+
+            try {
+                const response = await fetch("/start-download", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url, format })
+                });
+                const { id } = await response.json();
+
+                const interval = setInterval(async () => {
+                    const statusResponse = await fetch(`/download-status/${id}`);
+                    if (!statusResponse.ok) throw new Error("File not found");
+
+                    const { status } = await statusResponse.json();
+                    if (status === "completed") {
+                        clearInterval(interval);
+                        document.getElementById("status").textContent = "ダウンロード完了！";
+                        const downloadLink = document.getElementById("downloadLink");
+                        downloadLink.href = `/download-file/${id}`;
+                        downloadLink.style.display = "inline";
+                    } else if (status === "error") {
+                        clearInterval(interval);
+                        document.getElementById("status").textContent = "エラーが発生しました。";
+                    }
+                }, 3000);
+            } catch (error) {
+                document.getElementById("status").textContent = "リクエスト中にエラーが発生しました。";
+            }
+        });
+    </script>
+</body>
+</html>

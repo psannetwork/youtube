@@ -1,0 +1,31 @@
+{
+    "name": "youtube-downloader",
+    "version": "1.0.0",
+    "description": "A YouTube video downloader for mp4, mp3, and mov formats.",
+    "main": "server.js",
+    "scripts": {
+      "start": "node server.js"
+    },
+    "dependencies": {
+      "cors": "^2.8.5",
+      "crypto": "^1.0.1",
+      "express": "^4.18.2",
+      "express-rate-limit": "^6.7.0",
+      "ffmpeg-static": "^4.4.0",
+      "fluent-ffmpeg": "^2.1.2",
+      "youtube-dl-exec": "^2.0.1"
+    },
+    "engines": {
+      "node": ">=14.0.0"
+    },
+    "keywords": [
+      "youtube",
+      "downloader",
+      "mp4",
+      "mp3",
+      "mov"
+    ],
+    "author": "Psan",
+    "license": "ISC"
+  }
+  
