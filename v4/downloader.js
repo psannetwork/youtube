@@ -73,3 +73,6 @@ async function youtubeDL(videoUrl, format = 'mp3') {
 //youtubeDL("https://www.youtube.com/watch?v=nwtes0ETrtY&ab_channel=NatumeSaki", "mp3")
 //    .then(links => console.log("ダウンロードリンク:", links))
 //    .catch(error => console.error("ダウンロードに失敗しました:", error));
+
+//    <script src="https://raw.githubusercontent.com/hirotomoki12345/youtube/refs/heads/main/v4/downloader.js"></script>
+//　これを読み込んでからね
