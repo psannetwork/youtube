@@ -139,10 +139,11 @@ app.get('/download', (req, res) => {
 });
 
 function formatYoutubeUrl(url) {
-  const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^&\n]{11})/;
+  const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|shorts\/)|youtu\.be\/)([^&\n]{11})/;
   const match = url.match(regex);
   return match ? `https://www.youtube.com/watch?v=${match[1]}` : null;
 }
+
 
 function sanitizeFilename(filename) {
   return filename.replace(/[<>:"/\\|?*]+/g, '_').trim();
