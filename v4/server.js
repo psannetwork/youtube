@@ -4,8 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const youtubedl = require('youtube-dl-exec');
 const { exec } = require('child_process');
-const cors = require('cors'); // Import CORS
-const rateLimit = require('express-rate-limit'); // Import rate limit
+const cors = require('cors'); 
+const rateLimit = require('express-rate-limit'); 
 
 const app = express();
 const port = 3020;
@@ -16,13 +16,11 @@ if (!fs.existsSync(tmpDir)) {
   fs.mkdirSync(tmpDir);
 }
 
-// Enable CORS for all origins
 app.use(cors());
 
-// Rate limiting middleware
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // Limit each IP to 60 requests per windowMs
+  windowMs: 1 * 60 * 1000, 
+  max: 60, 
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use(limiter);
@@ -37,10 +35,9 @@ app.post('/request', async (req, res) => {
   const format = req.body.format;
   const ids = [];
 
-  // Check disk space
   const availableDiskSpace = getAvailableDiskSpace();
-  if (availableDiskSpace < 100 * 1024 * 1024) { // Check if less than 100 MB available
-    deleteLargestFileInDir(tmpDir); // Delete the largest file if space is insufficient
+  if (availableDiskSpace < 100 * 1024 * 1024) { 
+    deleteLargestFileInDir(tmpDir); 
   }
 
   for (const rawUrl of urls) {
