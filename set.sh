@@ -1,6 +1,6 @@
 #!/bin/bash
 
-npm install -g pm2
+# npm install -g pm2
 clear
 echo " ____                             _                      _    "
 echo "|  _ \ ___  __ _ _ __  _ __   ___| |___      _____  _ __| | __"
