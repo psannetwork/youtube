@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"> <!-- 文書の文字エンコーディングをUTF-8に設定 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- レスポンシブデザインのためのビューポート設定 -->
-    <title>YouTube Downloader</title> <!-- ウェブページのタイトル -->
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title> 
 </head>
 <body>
 
-    <h1>YouTube Video Downloader</h1> <!-- ページの見出し -->
+    <h1>YouTube Video Downloader</h1> 
 
     <button onclick="downloadVideo()">Download Video</button> <!-- ボタンをクリックするとdownloadVideo関数を呼び出す -->
 
-    <!-- GitHub Pagesからdownloader.jsを外部スクリプトとして読み込む -->
+    <!-- downloader.jsを外部スクリプトとして読み込む -->
     <script src="https://hirotomoki12345.github.io/youtube/v4/downloader.js"></script>
     
     <script>
         async function downloadVideo() { // 非同期関数downloadVideoを定義
             try {
-                const videoUrl = "https://www.youtube.com/watch?v=nwtes0ETrtY&ab_channel=NatumeSaki"; // ダウンロードする動画のURL
+                const videoUrl = "https://www.youtube.com/watch?v=xxxxxx"; // ダウンロードする動画のURL
                 const downloadLinks = await youtubeDL(videoUrl, "mp3"); // youtubeDL関数を呼び出してダウンロードリンクを取得
                 console.log("ダウンロードリンク:", downloadLinks); // ダウンロードリンクをコンソールに表示
             } catch (error) {
