@@ -260,13 +260,13 @@ setInterval(() => {
       fs.stat(dirPath, (err, stats) => {
         if (err) return;
         const now = Date.now();
-        if (now - stats.mtimeMs > 1 * 60 * 1000) {
+        if (now - stats.mtimeMs > 10 * 60 * 1000) {
           deleteDirectoryRecursive(dirPath);
         }
       });
     });
   });
-}, 1 * 60 * 1000);
+}, 10 * 60 * 1000);
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
