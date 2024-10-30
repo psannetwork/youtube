@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube ダウンローダー</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    let downloadIds = [];
+
+    async function addUrl() {
+      const url = document.getElementById('videoUrl').value;
+      const format = document.querySelector('input[name="format"]:checked').value;
+
+      if (!url) {
+        alert('YouTubeのURLを入力してください');
+        return;
+      }
+
+      const urlList = document.getElementById('urlList');
+      const listItem = document.createElement('li');
+      listItem.innerText = `URL: ${url} | フォーマット: ${format}`;
+      urlList.appendChild(listItem);
+      
+      downloadIds.push({ url, format });
+      document.getElementById('videoUrl').value = '';
+    }
+
+    function clearUrlList() {
+      downloadIds = [];
+      document.getElementById('urlList').innerHTML = '';
+    }
+
+    function toggleStatusDisplay() {
+      const statusOverlay = document.getElementById('statusOverlay');
+      statusOverlay.style.display = statusOverlay.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    async function requestDownload() {
+      if (downloadIds.length === 0) {
+        alert('URLリストが空です');
+        return;
+      }
+
+      const requestButton = document.getElementById('requestButton');
+      requestButton.disabled = true;
+      requestButton.classList.add('disabled');
+
+      toggleStatusDisplay();
+
+      try {
+        const response = await fetch('/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls: downloadIds.map(item => item.url), format: downloadIds[0].format })
+        });
+        const data = await response.json();
+
+        if (data.ids) {
+          for (const id of data.ids) {
+            const statusItem = document.createElement('li');
+            statusItem.id = `status-${id}`;
+            statusItem.innerText = `ダウンロードID: ${id} - 進行状況: 0%`;
+            document.getElementById('downloadStatus').appendChild(statusItem);
+            checkProgress(id);
+          }
+        } else {
+          alert('リクエストに失敗しました');
+        }
+      } catch (error) {
+        console.error('リクエストエラー:', error);
+      } finally {
+        requestButton.disabled = false;
+        requestButton.classList.remove('disabled');
+      }
+    }
+
+    async function checkProgress(downloadId) {
+      try {
+        const response = await fetch(`/download?id=${downloadId}`);
+        const data = await response.json();
+
+        if (data.status === 'downloading') {
+          const statusText = `ダウンロードID: ${downloadId} - 進行状況: ${data.progress.toFixed(2)}% 完了 - 残り時間: ${data.timeRemaining ? Math.round(data.timeRemaining) : '計算中...'}秒`;
+          document.getElementById(`status-${downloadId}`).innerText = statusText;
+          setTimeout(() => checkProgress(downloadId), 1000);
+        } else if (data.status === 'completed') {
+          const statusText = `ダウンロードID: ${downloadId} - 完了! ファイル: <a href="${data.url}" download>${data.url.split('/').pop()}</a> (${data.format})`;
+          document.getElementById(`status-${downloadId}`).innerHTML = statusText;
+        } else {
+          document.getElementById(`status-${downloadId}`).innerText = `ダウンロードID: ${downloadId} - 失敗しました`;
+        }
+      } catch (error) {
+        console.error('進捗チェックエラー:', error);
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>YouTube ダウンローダー</h1>
+    <div class="input-group">
+      <input type="text" id="videoUrl" placeholder="YouTubeのURLを入力" />
+      <button onclick="addUrl()">追加</button>
+    </div>
+    <div class="format-group">
+      <input type="radio" id="mp3" name="format" value="mp3" checked>
+      <label for="mp3">MP3</label>
+      <input type="radio" id="webm" name="format" value="webm">
+      <label for="webm">WebM</label>
+      <input type="radio" id="mp4" name="format" value="mp4">
+      <label for="mp4">MP4</label>
+    </div>
+    <button id="requestButton" onclick="requestDownload()">ダウンロードリクエスト</button>
+    <button onclick="clearUrlList()">リストをクリア</button>
+    <section>
+      <h2>URL リスト</h2>
+      <ul id="urlList"></ul>
+    </section>
+  </div>
+
+  <div id="statusOverlay" style="display:none;">
+    <button id="closeOverlay" onclick="toggleStatusDisplay()">✖</button>
+    <h2>ダウンロード ステータス</h2>
+    <ul id="downloadStatus"></ul>
+  </div>
+</body>
+</html>
