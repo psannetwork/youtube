@@ -19,7 +19,7 @@ read -p "Enter your choice: " CHOICE
 if [ "$CHOICE" == "1" ]; then
     sudo apt install ffmpeg
     git clone https://github.com/hirotomoki12345/youtube.git
-    cd youtube/v3
+    cd youtube/v4
     npm install
     sudo pm2 start npm --name "youtube-app" -- start 
     echo "Application started on port 3020."
