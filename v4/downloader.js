@@ -59,20 +59,35 @@ async function checkDownloadStatus(ids, interval = 1000) {
 }
 
 async function youtubeDL(videoUrl, format = 'mp3') {
-    const urlsArray = [videoUrl]; // 引数として単一URLを配列に変換
+    const urlsArray = [videoUrl];
     
     try {
         const downloadUrls = await downloadVideos(urlsArray, format);
+        downloadUrls.forEach(url => createDownloadLink(url));
         return downloadUrls.map(url => `${baseurls}${url}`);
     } catch (error) {
         console.error('Error during downloading:', error);
         throw error; 
     }
 }
-// 動画URLとフォーマットを指定して実行
+
+function createDownloadLink(url) {
+    const downloadUrl = url.startsWith('http') ? url : `${baseurls}${url}`; 
+    const filename = downloadUrl.split('/').pop(); 
+    
+    const downloadLink = document.createElement('a');
+    downloadLink.href = downloadUrl; 
+    downloadLink.download = filename; 
+    downloadLink.style.display = 'none'; 
+    document.body.appendChild(downloadLink); 
+    
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+}
+
 //youtubeDL("https://www.youtube.com/watch?v=nwtes0ETrtY&ab_channel=NatumeSaki", "mp3")
-//    .then(links => console.log("ダウンロードリンク:", links))
-//    .catch(error => console.error("ダウンロードに失敗しました:", error));
+  //  .then(links => console.log("ダウンロードリンク:", links))
+    //.catch(error => console.error("ダウンロードに失敗しました:", error));
 
 //    <script src="https://raw.githubusercontent.com/hirotomoki12345/youtube/refs/heads/main/v4/downloader.js"></script>
 //　これを読み込んでからね
