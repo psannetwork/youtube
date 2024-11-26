@@ -4,8 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const youtubedl = require('youtube-dl-exec');
 const { exec } = require('child_process');
-const cors = require('cors'); 
-const rateLimit = require('express-rate-limit'); 
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const port = 3020;
@@ -17,14 +17,11 @@ if (!fs.existsSync(tmpDir)) {
 }
 
 app.use(cors());
-
-const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, 
-  max: 60, 
+app.use(rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
   message: 'Too many requests from this IP, please try again later.'
-});
-app.use(limiter);
-
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -35,15 +32,14 @@ app.post('/request', async (req, res) => {
   const format = req.body.format;
   const ids = [];
 
-  const availableDiskSpace = getAvailableDiskSpace();
-  if (availableDiskSpace < 100 * 1024 * 1024) { 
-    deleteLargestFileInDir(tmpDir); 
+  if (getAvailableDiskSpace() < 100 * 1024 * 1024) {
+    deleteLargestFileInDir(tmpDir);
   }
 
   for (const rawUrl of urls) {
     const url = formatYoutubeUrl(rawUrl);
     if (!url) {
-      return res.status(400).json({ error: 'URLが無効です。YouTubeのビデオIDが見つかりません。' });
+      return res.status(400).json({ error: 'Invalid URL: Cannot find YouTube video ID.' });
     }
 
     const id = Math.random().toString(36).substring(7);
@@ -62,20 +58,21 @@ app.post('/request', async (req, res) => {
       });
 
       if (!output.fulltitle) {
-        return res.status(500).json({ error: '動画情報の取得中にエラーが発生しました。' });
+        return res.status(500).json({ error: 'Error fetching video information.' });
       }
 
       const title = sanitizeFilename(output.fulltitle);
       const finalFilePath = path.join(videoDir, `${title}.${format}`);
       const fileSize = output.filesize || output.contentLength;
 
-      const downloadProcess = youtubedl.exec(url, {
-        output: finalFilePath,
-        format: 'best'
-      });
-
+      const downloadCommand = format === 'mp4'
+  ? `yt-dlp -f bestvideo[ext=mp4]+bestaudio[ext=m4a] --merge-output-format mp4 -o "${finalFilePath}" "${url}"`
+  : format === 'mp3'
+    ? `yt-dlp -f bestaudio --extract-audio --audio-format mp3 -o "${finalFilePath}" "${url}"`
+    : `yt-dlp -f best[ext=${format}] -o "${finalFilePath}" "${url}"`;
+      const downloadProcess = exec(downloadCommand);
       let startTime = Date.now();
-      
+
       downloadProcess.stdout.on('data', (data) => {
         const progressMatch = data.toString().match(/(\d+\.\d+)%/);
         if (progressMatch) {
@@ -87,7 +84,7 @@ app.post('/request', async (req, res) => {
             if (remainingPercentage > 0) {
               downloadStatus[id].timeRemaining = (elapsedTime / progress) * remainingPercentage;
             }
-            const downloadedBytes = (fileSize * (progress / 100));
+            const downloadedBytes = fileSize * (progress / 100);
             downloadStatus[id].speed = downloadedBytes / elapsedTime;
           }
         }
@@ -97,20 +94,18 @@ app.post('/request', async (req, res) => {
         if (code === 0) {
           downloadStatus[id].status = 'completed';
           downloadStatus[id].url = `/tmp/${id}/${title}.${format}`;
-          downloadStatus[id].format = format;
+          if (format === 'mp3') {
 
-          if (format === 'mp3' || format === 'webm') {
-            convertVideo(finalFilePath, videoDir, title);
+                  downloadStatus[id].mp3Url = `/tmp/${id}/${title}.mp3`; // 直接URLを設定
+
           }
         } else {
           downloadStatus[id].status = 'error';
-          // Check if the error is due to disk space
-          res.status(507).json({ error: 'サーバーに空き容量が不足しているため、ダウンロードに失敗しました。' });
         }
       });
     } catch (error) {
       if (!res.headersSent) {
-        return res.status(500).json({ error: '動画情報の取得中にエラーが発生しました。' });
+        return res.status(500).json({ error: 'Error fetching video information.' });
       }
     }
   }
@@ -124,7 +119,7 @@ app.post('/download', (req, res) => {
   if (status) {
     res.json(status);
   } else {
-    res.status(404).json({ error: 'IDが見つかりません。' });
+    res.status(404).json({ error: 'ID not found.' });
   }
 });
 
@@ -134,7 +129,7 @@ app.get('/download', (req, res) => {
   if (status) {
     res.json(status);
   } else {
-    res.status(404).json({ error: 'IDが見つかりません。' });
+    res.status(404).json({ error: 'ID not found.' });
   }
 });
 
@@ -144,7 +139,6 @@ function formatYoutubeUrl(url) {
   return match ? `https://www.youtube.com/watch?v=${match[1]}` : null;
 }
 
-
 function sanitizeFilename(filename) {
   return filename.replace(/[<>:"/\\|?*]+/g, '_').trim();
 }
@@ -153,53 +147,11 @@ function convertVideo(inputFilePath, videoDir, title) {
   const outputMp3Path = path.join(videoDir, `${title}.mp3`);
   const ffmpegCommand = `ffmpeg -i "${inputFilePath}" -vn -ar 44100 -ac 2 -b:a 192k "${outputMp3Path}"`;
 
-  exec(ffmpegCommand, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`FFmpeg Error: ${error.message}`);
-      return;
+  exec(ffmpegCommand, (error) => {
+    if (!error) {
+      const videoId = path.basename(videoDir);
+      downloadStatus[videoId].mp3Url = `/tmp/${videoId}/${title}.mp3`;
     }
-    const videoId = path.basename(videoDir);
-    downloadStatus[videoId].mp3Url = `/tmp/${path.basename(videoDir)}/${title}.mp3`;
-  });
-}
-
-function deleteDirectoryRecursive(dir) {
-  fs.readdir(dir, (err, files) => {
-    if (err) {
-      console.error(`Error reading directory: ${dir}`, err);
-      return;
-    }
-
-    let remaining = files.length;
-    if (remaining === 0) {
-      fs.rmdir(dir, (err) => {
-        if (err) console.error(`Error deleting directory: ${dir}`, err);
-      });
-      return;
-    }
-
-    files.forEach((file) => {
-      const filePath = path.join(dir, file);
-      fs.stat(filePath, (err, stats) => {
-        if (err) {
-          console.error(`Error getting stats for file: ${filePath}`, err);
-          return;
-        }
-
-        if (stats.isDirectory()) {
-          deleteDirectoryRecursive(filePath);
-        } else {
-          fs.unlink(filePath, (err) => {
-            if (err) console.error(`Error deleting file: ${filePath}`, err);
-            if (--remaining === 0) {
-              fs.rmdir(dir, (err) => {
-                if (err) console.error(`Error deleting directory: ${dir}`, err);
-              });
-            }
-          });
-        }
-      });
-    });
   });
 }
 
@@ -207,67 +159,40 @@ function getAvailableDiskSpace() {
   const { execSync } = require('child_process');
   try {
     const output = execSync('df --output=avail /').toString();
-    const space = parseInt(output.split('\n')[1]);
-    return space; // Return available space in KB
-  } catch (error) {
-    console.error(`Error getting disk space: ${error.message}`);
+    return parseInt(output.split('\n')[1]);
+  } catch {
     return 0;
   }
 }
 
 function deleteLargestFileInDir(dir) {
   fs.readdir(dir, (err, files) => {
-    if (err) {
-      console.error(`Error reading directory: ${dir}`, err);
-      return;
-    }
-
-    let largestFile = null;
-    let largestFileSize = 0;
-
-    files.forEach((file) => {
-      const filePath = path.join(dir, file);
-      fs.stat(filePath, (err, stats) => {
-        if (err) {
-          console.error(`Error getting stats for file: ${filePath}`, err);
-          return;
-        }
-
-        if (stats.isFile() && stats.size > largestFileSize) {
-          largestFileSize = stats.size;
-          largestFile = filePath;
-        }
-
-        if (largestFile) {
-          fs.unlink(largestFile, (err) => {
-            if (err) {
-              console.error(`Error deleting largest file: ${largestFile}`, err);
-            } else {
-              console.log(`Deleted largest file: ${largestFile}`);
-            }
-          });
-        }
+    if (!err) {
+      files.forEach((file) => {
+        const filePath = path.join(dir, file);
+        fs.stat(filePath, (err, stats) => {
+          if (!err && stats.isFile() && stats.size > 0) {
+            fs.unlink(filePath, () => {});
+          }
+        });
       });
-    });
+    }
   });
 }
 
 setInterval(() => {
   fs.readdir(tmpDir, (err, dirs) => {
-    if (err) return;
-    dirs.forEach((dir) => {
-      const dirPath = path.join(tmpDir, dir);
-      fs.stat(dirPath, (err, stats) => {
-        if (err) return;
-        const now = Date.now();
-        if (now - stats.mtimeMs > 10 * 60 * 1000) {
-          deleteDirectoryRecursive(dirPath);
-        }
+    if (!err) {
+      dirs.forEach((dir) => {
+        const dirPath = path.join(tmpDir, dir);
+        fs.stat(dirPath, (err, stats) => {
+          if (!err && Date.now() - stats.mtimeMs > 10 * 60 * 1000) {
+            fs.rmdir(dirPath, { recursive: true }, () => {});
+          }
+        });
       });
-    });
+    }
   });
 }, 10 * 60 * 1000);
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
