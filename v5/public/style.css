@@ -1,0 +1,133 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  background-color: #222;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.container {
+  padding: 20px;
+  background-color: #333;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 100%;
+}
+
+h1 {
+  text-align: center;
+  color: #ff7a00;
+  margin-bottom: 20px;
+}
+
+.input-group,
+.format-group,
+button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+input[type="text"] {
+  padding: 8px;
+  width: 70%;
+  border: 2px solid #ff7a00;
+  border-radius: 4px;
+  color: #fff;
+  background-color: #444;
+}
+
+button {
+  padding: 8px 16px;
+  color: #222;
+  background-color: #ff7a00;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #e66b00;
+}
+
+button.disabled {
+  background-color: #777;
+  cursor: not-allowed;
+}
+
+.format-group label {
+  margin-right: 5px;
+}
+
+input[type="radio"] {
+  accent-color: #ff7a00;
+}
+
+#urlList, #downloadStatus {
+  padding: 10px;
+  background-color: #222;
+  border: 1px solid #ff7a00;
+  border-radius: 4px;
+  margin-top: 10px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.progress {
+  width: 100%;
+  background-color: #444;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.progress-bar {
+  height: 8px;
+  background-color: #ff7a00;
+  width: 0;
+  transition: width 0.3s ease;
+}
+
+#statusOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 20px;
+  z-index: 1000;
+  color: #fff;
+}
+
+#closeOverlay {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #ff7a00;
+  cursor: pointer;
+}
+
+#closeOverlay:hover {
+  color: #e66b00;
+}
