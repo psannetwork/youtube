@@ -27,7 +27,27 @@ app.use(bodyParser.json());
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
-app.use('/tmp', express.static(tmpDir));
+//app.use('/tmp', express.static(tmpDir));
+app.use('/tmp', (req, res, next) => {
+  const filePath = path.join(tmpDir, decodeURIComponent(req.path)); // URLデコードを追加
+
+  if (fs.existsSync(filePath) && !fs.statSync(filePath).isDirectory()) {
+    const fileName = path.basename(filePath);
+
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        res.status(500).send('Error downloading file.');
+      }
+    });
+  } else {
+    next();
+  }
+});
+
 
 app.post('/request', async (req, res) => {
   const urls = req.body.urls;
