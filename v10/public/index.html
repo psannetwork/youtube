@@ -23,7 +23,6 @@
 <body>
   <div class="container">
     <h1>YouTube ダウンロード</h1>
-
     <div class="form-group">
       <label for="url-input">YouTube URL:</label>
       <input type="text" id="url-input" placeholder="YouTubeのURLを入力">
@@ -36,7 +35,6 @@
       </select>
     </div>
     <button id="add-button">リストに追加</button>
-
     <h2>ダウンロードリスト</h2>
     <ul id="request-list"></ul>
     <button id="download-all-button">全てダウンロード</button>
@@ -48,29 +46,30 @@
     const requests = {};
 
     ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  const { requestId, type, percentage, files, message } = data;
+      const data = JSON.parse(event.data);
+      const { requestId, type, percentage, files, message } = data;
 
-  if (type === 'progress') {
-    const progressBar = document.querySelector(`#progress-${requestId}`);
-    if (progressBar) progressBar.style.width = `${percentage}%`;
-  } else if (type === 'complete') {
-    const linkContainer = document.querySelector(`#link-${requestId}`);
-    if (files && files.length > 0) {
-      linkContainer.innerHTML = files
-        .map((file) => `<a href="${file.fileUrl}" target="_blank" download>${file.fileName}</a>`)
-        .join('<br>');
-    } else {
-      linkContainer.innerHTML = '<span>ダウンロードされたファイルが見つかりません。</span>';
-    }
-    document.querySelector(`#progress-bar-${requestId}`).style.backgroundColor = '#4caf50';
-  } else if (type === 'error') {
-    alert(`エラー: ${message}`);
-    const progressBar = document.querySelector(`#progress-bar-${requestId}`);
-    if (progressBar) progressBar.style.backgroundColor = 'red';
-  }
-};
-
+      if (type === 'progress') {
+        const progressBar = document.querySelector(`#progress-${requestId}`);
+        if (progressBar) progressBar.style.width = `${percentage}%`;
+      } else if (type === 'complete') {
+        const linkContainer = document.querySelector(`#link-${requestId}`);
+        if (files && files.length > 0) {
+          linkContainer.innerHTML = files
+            .map((file) => `<a href="${file.fileUrl}" target="_blank" download>${file.fileName}</a>`)
+            .join('<br>');
+        } else {
+          linkContainer.innerHTML = '<span>ダウンロードされたファイルが見つかりません。</span>';
+        }
+        document.querySelector(`#progress-bar-${requestId}`).style.backgroundColor = '#4caf50';
+        enableButtons();
+      } else if (type === 'error') {
+        alert(`エラー: ${message}`);
+        const progressBar = document.querySelector(`#progress-bar-${requestId}`);
+        if (progressBar) progressBar.style.backgroundColor = 'red';
+        enableButtons();
+      }
+    };
 
     document.getElementById('add-button').addEventListener('click', () => {
       const url = document.getElementById('url-input').value;
@@ -98,13 +97,29 @@
     });
 
     document.getElementById('download-all-button').addEventListener('click', () => {
+      disableButtons();
       Object.keys(requests).forEach((id) => startDownload(id));
     });
 
     function startDownload(requestId) {
       const { url, format } = requests[requestId];
       document.getElementById(`progress-bar-${requestId}`).style.display = 'block';
+      disableButtons();
       ws.send(JSON.stringify({ requestId, url, format }));
+    }
+
+    function disableButtons() {
+      document.getElementById('add-button').disabled = true;
+      document.getElementById('download-all-button').disabled = true;
+      const downloadButtons = document.querySelectorAll('button[onclick^="startDownload"]');
+      downloadButtons.forEach((btn) => btn.disabled = true);
+    }
+
+    function enableButtons() {
+      document.getElementById('add-button').disabled = false;
+      document.getElementById('download-all-button').disabled = false;
+      const downloadButtons = document.querySelectorAll('button[onclick^="startDownload"]');
+      downloadButtons.forEach((btn) => btn.disabled = false);
     }
   </script>
 </body>
