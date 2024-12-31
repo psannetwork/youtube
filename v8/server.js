@@ -93,22 +93,25 @@ function generateRandomString(length) {
 app.use(express.static('public'));
 
 app.get('/download/:dir/:filename', (req, res) => {
-    const { dir, filename } = req.params;
-    const filePath = path.join('/tmp', dir, filename);
-  
-    fs.exists(filePath, (exists) => {
-      if (!exists) {
-        res.status(404).send('ファイルが見つかりません');
-        return; 
+  const { dir, filename } = req.params;
+  const filePath = path.join('/tmp', dir, filename);
+
+  // ファイルが存在するか確認
+  fs.exists(filePath, (exists) => {
+    if (!exists) {
+      res.status(404).send('ファイルが見つかりません');
+      return; 
+    }
+
+    // ファイルのダウンロードを提供
+    res.download(filePath, (err) => {
+      if (err) {
+        res.status(500).send('ファイルのダウンロード中にエラーが発生しました');
       }
-  
-      res.download(filePath, (err) => {
-        if (err) {
-          res.status(500).send('ファイルのダウンロード中にエラーが発生しました');
-        }
-      });
     });
   });
+});
+
   
 app.server = app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
