@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="YouTube ダウンローダー - 動画を簡単にダウンロード">
+  <title>YouTube ダウンロード</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .progress-bar {
+      width: 100%;
+      background-color: #f3f3f3;
+      border: 1px solid #ccc;
+      margin-top: 5px;
+    }
+    .progress {
+      height: 20px;
+      width: 0%;
+      background-color: #4caf50;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>YouTube ダウンロード</h1>
+    <div class="form-group">
+      <label for="url-input">YouTube URL:</label>
+      <input type="text" id="url-input" placeholder="YouTubeのURLを入力">
+    </div>
+    <div class="form-group">
+      <label for="format-input">ダウンロード形式:</label>
+      <select id="format-input">
+        <option value="mp4">MP4 (動画)</option>
+        <option value="mp3">MP3 (音声)</option>
+      </select>
+    </div>
+    <button id="add-button">リストに追加</button>
+    <h2>ダウンロードリスト</h2>
+    <ul id="request-list"></ul>
+    <button id="download-all-button">全てダウンロード</button>
+  </div>
+
+  <script>
+    const ws = new WebSocket('wss://' + window.location.host);
+    let requestIdCounter = 0;
+    const requests = {};
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const { requestId, type, percentage, files, message } = data;
+
+        if (type === 'progress') {
+          const progressBar = document.querySelector(`#progress-${requestId}`);
+          if (progressBar) progressBar.style.width = `${percentage}%`;
+        } else if (type === 'complete') {
+          const linkContainer = document.querySelector(`#link-${requestId}`);
+          if (files && files.length > 0) {
+            linkContainer.innerHTML = files
+              .map((file) => `<a href="${file.fileUrl}" target="_blank" download>${file.fileName}</a>`)
+              .join('<br>');
+          } else {
+            linkContainer.innerHTML = '<span>ダウンロードされたファイルが見つかりません。</span>';
+          }
+          document.querySelector(`#progress-bar-${requestId}`).style.backgroundColor = '#4caf50';
+          enableButtons();
+        } else if (type === 'error') {
+          alert(`エラー: ${message}`);
+          const progressBar = document.querySelector(`#progress-bar-${requestId}`);
+          if (progressBar) progressBar.style.backgroundColor = 'red';
+          enableButtons();
+        }
+      } catch (error) {
+        console.error('WebSocketメッセージの処理中にエラーが発生しました:', error);
+        alert('メッセージの処理中にエラーが発生しました。');
+      }
+    };
+
+    document.getElementById('add-button').addEventListener('click', async () => {
+      const url = document.getElementById('url-input').value;
+      const format = document.getElementById('format-input').value;
+
+      if (!url || !/^https?:\/\/(www\.)?youtube\.com\/|youtu\.be\//.test(url)) {
+        alert('正しいYouTube URLを入力してください');
+        return;
+      }
+
+      const playlistMatch = url.match(/(?:\?|\&)list=([^&]+)/);
+      if (playlistMatch) {
+        const playlistId = playlistMatch[1];
+        const playlistResponse = await fetch(`/fetch-playlist?playlistId=${playlistId}`);
+        const playlistData = await playlistResponse.json();
+        const videos = playlistData.videos;
+
+        document.getElementById('request-list').innerHTML = ''; // 一度リストを消してから新しいリストを追加
+
+        videos.forEach((video) => {
+          const cleanedUrl = cleanYouTubeUrl(video.url);
+
+          const requestId = ++requestIdCounter;
+          requests[requestId] = { url: cleanedUrl, format };
+
+          const listItem = document.createElement('li');
+          listItem.id = `request-${requestId}`;
+          listItem.innerHTML = `
+            <span>${video.title} (${format})</span>
+            <button onclick="startDownload(${requestId})">ダウンロード</button>
+            <div class="progress-bar" id="progress-bar-${requestId}">
+              <div class="progress" id="progress-${requestId}"></div>
+            </div>
+            <div id="link-${requestId}"></div>
+          `;
+          document.getElementById('request-list').appendChild(listItem);
+        });
+      } else {
+        const cleanedUrl = cleanYouTubeUrl(url);
+
+        const requestId = ++requestIdCounter;
+        requests[requestId] = { url: cleanedUrl, format };
+
+        const listItem = document.createElement('li');
+        listItem.id = `request-${requestId}`;
+        listItem.innerHTML = `
+          <span>${cleanedUrl} (${format})</span>
+          <button onclick="startDownload(${requestId})">ダウンロード</button>
+          <div class="progress-bar" id="progress-bar-${requestId}">
+            <div class="progress" id="progress-${requestId}"></div>
+          </div>
+          <div id="link-${requestId}"></div>
+        `;
+        document.getElementById('request-list').appendChild(listItem);
+      }
+    });
+
+    document.getElementById('download-all-button').addEventListener('click', () => {
+      disableButtons();
+      Object.keys(requests).forEach((id) => startDownload(id));
+    });
+
+    function startDownload(requestId) {
+      const { url, format } = requests[requestId];
+      document.getElementById(`progress-bar-${requestId}`).style.display = 'block';
+      disableButtons();
+      ws.send(JSON.stringify({ requestId, url, format }));
+    }
+
+    function disableButtons() {
+      document.getElementById('add-button').disabled = true;
+      document.getElementById('download-all-button').disabled = true;
+      const downloadButtons = document.querySelectorAll('button[onclick^="startDownload"]');
+      downloadButtons.forEach((btn) => btn.disabled = true);
+    }
+
+    function enableButtons() {
+      document.getElementById('add-button').disabled = false;
+      document.getElementById('download-all-button').disabled = false;
+      const downloadButtons = document.querySelectorAll('button[onclick^="startDownload"]');
+      downloadButtons.forEach((btn) => btn.disabled = false);
+    }
+
+    function cleanYouTubeUrl(url) {
+      const urlObj = new URL(url);
+      const searchParams = new URLSearchParams(urlObj.search);
+      const videoId = searchParams.get('v');
+      
+      if (videoId) {
+        return `${urlObj.origin}${urlObj.pathname}?v=${videoId}`;
+      }
+      return url;
+    }
+  </script>
+</body>
+</html>
