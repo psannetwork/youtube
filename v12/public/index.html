@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PsanのYouTubeダウンローダー。1080p画質で動画をダウンロード。MP4、MP3に対応。">
+  <meta name="keywords" content="YouTubeダウンローダー, 1080p, MP4, MP3, Psan, Psannetwork">
+  <meta name="author" content="Psan">
+  <meta property="og:title" content="Psan YouTube ダウンローダー">
+  <meta property="og:description" content="1080p画質でYouTube動画をダウンロード。MP4、MP3対応。">
+  <meta property="og:url" content="https://psannetwork.net">
+  <link rel="icon" href="favicon.jpeg">
+  <title>YouTube ダウンロード</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>YouTube ダウンロード</h1>
+    
+    <!-- WebSocket接続先URL選択UI -->
+    <div class="form-group">
+      <label for="ws-url-select">WebSocket 接続先:</label>
+      <select id="ws-url-select">
+        <option value="">読み込み中...</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="url-input">YouTube URL:</label>
+      <input type="text" id="url-input" placeholder="YouTubeのURLを入力">
+    </div>
+    <div class="form-group">
+      <label for="format-input">ダウンロード形式:</label>
+      <select id="format-input">
+        <option value="mp4">MP4 (動画)</option>
+        <option value="mp3">MP3 (音声)</option>
+      </select>
+    </div>
+    <button id="add-button">リストに追加</button>
+    <button id="download-all-button">すべての動画をダウンロード</button>
+    <h2>ダウンロードリスト</h2>
+    <ul id="request-list"></ul>
+    <div class="copyright">
+      <span>©Psannetwork 2025</span> YouTube Downloader. Written by psan.
+    </div>
+  </div>
+
+  <script>
+    let ws;
+    let requestIdCounter = 0;
+    const requests = {};
+
+    // WebSocket URLリストを取得して選択肢を生成
+    fetch('/url_list.json')
+      .then(response => response.json())
+      .then(urlList => {
+        const wsSelect = document.getElementById('ws-url-select');
+        wsSelect.innerHTML = ''; // 初期化
+        urlList.forEach((urlItem) => {
+          const option = document.createElement('option');
+          option.value = urlItem.url;
+          option.textContent = urlItem.name;
+          wsSelect.appendChild(option);
+        });
+        
+        // 初期WebSocket接続をデフォルトURLに接続
+        wsSelect.addEventListener('change', () => {
+          const selectedUrl = wsSelect.value;
+          if (selectedUrl) {
+            setupWebSocket(selectedUrl);
+          }
+        });
+      })
+      .catch(error => {
+        console.error('URLリストの読み込みに失敗しました:', error);
+      });
+
+    function setupWebSocket(url) {
+      if (ws) {
+        ws.close();
+      }
+      ws = new WebSocket(url);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const { requestId, type, percentage, files, message } = data;
+
+          if (type === 'progress') {
+            const progressBar = document.querySelector(`#progress-${requestId}`);
+            if (progressBar) {
+              progressBar.style.width = `${percentage}%`;
+            }
+          } else if (type === 'complete') {
+            const linkContainer = document.querySelector(`#link-${requestId}`);
+            if (linkContainer) {
+              if (files && files.length > 0) {
+                linkContainer.innerHTML = files.map((file) => 
+                  `<a href="${file.fileUrl}" target="_blank" download>${file.fileName}</a>`
+                ).join('<br>');
+              } else {
+                linkContainer.innerHTML = '<span>ダウンロードされたファイルが見つかりません。</span>';
+              }
+            }
+            document.querySelector(`#progress-bar-${requestId}`).style.backgroundColor = '#4caf50';
+          } else if (type === 'error') {
+            alert(`エラー: ${message}`);
+            const progressBar = document.querySelector(`#progress-bar-${requestId}`);
+            if (progressBar) progressBar.style.backgroundColor = 'red';
+          }
+        } catch (error) {
+          console.error('WebSocketメッセージの処理中にエラーが発生しました:', error);
+          alert('メッセージの処理中にエラーが発生しました。');
+        }
+      };
+    }
+
+    document.getElementById('add-button').addEventListener('click', async () => {
+      const url = document.getElementById('url-input').value;
+      const format = document.getElementById('format-input').value;
+      if (!url || !/^https?:\/\/(www\.)?youtube\.com\/|youtu\.be\//.test(url)) {
+        alert('正しいYouTube URLを入力してください');
+        return;
+      }
+
+      const playlistMatch = url.match(/(?:\?|\&)list=([^&]+)/);
+      if (playlistMatch) {
+        const playlistId = playlistMatch[1];
+        const playlistResponse = await fetch(`/fetch-playlist?playlistId=${playlistId}`);
+        const playlistData = await playlistResponse.json();
+        const videos = playlistData.videos;
+        document.getElementById('request-list').innerHTML = '';
+        videos.forEach((video, index) => {
+          const cleanedUrl = cleanYouTubeUrl(video.url);
+          const requestId = ++requestIdCounter;
+          requests[requestId] = { url: cleanedUrl, format };
+          const listItem = document.createElement('li');
+          listItem.id = `request-${requestId}`;
+          listItem.innerHTML = `
+            <span>${video.title} (${format})</span>
+            <button onclick="startDownload(${requestId})">ダウンロード</button>
+            <div class="progress-bar" id="progress-bar-${requestId}">
+              <div class="progress" id="progress-${requestId}"></div>
+            </div>
+            <div id="link-${requestId}" class="link-container"></div>
+          `;
+          document.getElementById('request-list').appendChild(listItem);
+        });
+      } else {
+        const cleanedUrl = cleanYouTubeUrl(url);
+        const requestId = ++requestIdCounter;
+        requests[requestId] = { url: cleanedUrl, format };
+        const listItem = document.createElement('li');
+        listItem.id = `request-${requestId}`;
+        listItem.innerHTML = `
+          <span>${cleanedUrl} (${format})</span>
+          <button onclick="startDownload(${requestId})">ダウンロード</button>
+          <div class="progress-bar" id="progress-bar-${requestId}">
+            <div class="progress" id="progress-${requestId}"></div>
+          </div>
+          <div id="link-${requestId}" class="link-container"></div>
+        `;
+        document.getElementById('request-list').appendChild(listItem);
+      }
+    });
+
+    document.getElementById('download-all-button').addEventListener('click', () => {
+      Object.keys(requests).forEach(requestId => {
+        startDownload(requestId);
+      });
+    });
+
+    function startDownload(requestId) {
+      const { url, format } = requests[requestId];
+      document.getElementById(`progress-bar-${requestId}`).style.display = 'block';
+      ws.send(JSON.stringify({ requestId, url, format }));
+      disableButtons(true);
+    }
+
+    function cleanYouTubeUrl(url) {
+      const urlObj = new URL(url);
+      if (urlObj.hostname === 'youtu.be') {
+        return `https://www.youtube.com/watch?v=${urlObj.pathname.slice(1)}`;
+      }
+      if (urlObj.hostname === 'm.youtube.com') {
+        return `https://www.youtube.com/watch?v=${urlObj.searchParams.get('v')}`;
+      }
+      urlObj.searchParams.delete('list');
+      return urlObj.toString();
+    }
+
+    function disableButtons(isDisabled) {
+      const buttons = document.querySelectorAll('button');
+      buttons.forEach(button => {
+        button.disabled = isDisabled;
+        if (isDisabled) {
+          button.style.backgroundColor = '#ccc';
+        } else {
+          button.style.backgroundColor = '#4CAF50';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

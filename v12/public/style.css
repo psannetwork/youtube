@@ -1,0 +1,195 @@
+/* 全体設定 */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f4f4f4;
+}
+
+.container {
+  width: 90%;
+  max-width: 600px;
+  margin: 20px auto;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+/* ヘッダー */
+h1 {
+  text-align: center;
+  color: #333;
+  font-size: 2rem;
+  margin-bottom: 20px;
+}
+
+/* フォームグループ */
+.form-group {
+  margin-bottom: 20px;
+}
+
+label {
+  font-weight: bold;
+  color: #333;
+}
+
+input, select {
+  width: 100%;
+  padding: 12px;
+  margin-top: 5px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+/* ボタンのスタイル */
+button {
+  width: 100%;
+  padding: 12px;
+  background-color: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-bottom: 15px;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+button:hover:enabled {
+  background-color: #45a049;
+}
+
+/* ダウンロードリスト */
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 250px; /* 最大高さを指定してスクロールを有効化 */
+  overflow-y: auto;  /* 縦スクロールを有効に */
+}
+
+li {
+  padding: 15px;
+  background-color: #f9f9f9;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+
+li span {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
+  color: #333;
+}
+
+li button {
+  width: auto;
+  padding: 5px 10px;
+  font-size: 1rem;
+  background-color: #2196F3;
+  cursor: pointer;
+}
+
+li button:disabled {
+  background-color: #ccc;
+}
+
+/* プログレスバー */
+.progress-bar {
+  background-color: #f3f3f3;
+  border-radius: 5px;
+  height: 10px;
+  margin-top: 10px;
+  width: 100%;
+  display: none;
+}
+
+.progress {
+  height: 100%;
+  background-color: #4CAF50;
+  width: 0%;
+}
+
+/* フッター */
+.copyright {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+
+  label {
+    font-size: 1rem;
+  }
+
+  input, select {
+    font-size: 1rem;
+  }
+
+  button {
+    font-size: 1rem;
+  }
+
+  ul {
+    max-height: 250px;
+  }
+
+  .form-group {
+    margin-bottom: 15px;
+  }
+}
+
+/* 広告を考慮したスペース確保 */
+@media (min-width: 768px) {
+  .container {
+    padding-bottom: 20px;
+  }
+
+  .container:after {
+    content: '';
+    display: block;
+    height: 50px; /* 広告の高さ */
+    background-color: #f4f4f4;
+  }
+}
+
+/* スクロールの改善 */
+body {
+  overflow-x: hidden;
+}
+
+.container {
+  overflow-y: auto;
+  max-height: 90vh; /* スクロール領域をビュー高さの90%に制限 */
+}
+
+ul {
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+/* ボタンの間隔調整 */
+button + button {
+  margin-top: 10px;
+}
