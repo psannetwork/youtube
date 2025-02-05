@@ -1,24 +1,38 @@
-#セットアップ方法
+# セットアップ方法
 
-Clone this repository
+## リポジトリをクローンする
+```
+git clone https://github.com/hirotomoki12345/youtube.git
+```
 
-```git clone https://github.com/hirotomoki12345/youtube.git```
+## ディレクトリに移動
+```
+cd youtube
+```
+## 必要なパッケージをインストール
+```
+npm i
+```
+## youtube-dl-exec パッケージをインストール
+```
+npm install youtube-dl-exec --save
+```
+## アプリケーションを起動
+```
+npm start
+```
 
-Enter the directory
 
-```cd youtube```
+# フロントエンドのみホストする方法
 
-Run this Command
+ZIPファイルでリポジトリをダウンロード
 
-```npm i```
+GitHubからZIPファイルをダウンロードします。
 
-```npm install youtube-dl-exec --save```
+ダウンロードしたファイルを展開
 
-```npm start```
+ダウンロードしたZIPファイルを展開します。
 
+public フォルダの中身をホスト
 
-or
-
-```curl -Ls https://raw.githubusercontent.com/hirotomoki12345/youtube/main/set.sh -o set.sh```
-
-```bash ./set.sh```
+展開したディレクトリの中の public フォルダ内のファイルをお好きな方法でホストしてください。
