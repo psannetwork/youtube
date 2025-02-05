@@ -1,4 +1,4 @@
-##セットアップ方法
+#セットアップ方法
 
 Clone this repository
 
