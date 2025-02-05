@@ -51,7 +51,7 @@
     const requests = {};
 
     // WebSocket URLリストを取得して選択肢を生成
-    fetch('/url_list.json')
+    fetch('url_list.json')
       .then(response => response.json())
       .then(urlList => {
         const wsSelect = document.getElementById('ws-url-select');
@@ -75,44 +75,88 @@
         console.error('URLリストの読み込みに失敗しました:', error);
       });
 
-    function setupWebSocket(url) {
-      if (ws) {
-        ws.close();
-      }
-      ws = new WebSocket(url);
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const { requestId, type, percentage, files, message } = data;
 
-          if (type === 'progress') {
-            const progressBar = document.querySelector(`#progress-${requestId}`);
-            if (progressBar) {
-              progressBar.style.width = `${percentage}%`;
-            }
-          } else if (type === 'complete') {
-            const linkContainer = document.querySelector(`#link-${requestId}`);
-            if (linkContainer) {
-              if (files && files.length > 0) {
-                linkContainer.innerHTML = files.map((file) => 
-                  `<a href="${file.fileUrl}" target="_blank" download>${file.fileName}</a>`
-                ).join('<br>');
-              } else {
-                linkContainer.innerHTML = '<span>ダウンロードされたファイルが見つかりません。</span>';
-              }
-            }
-            document.querySelector(`#progress-bar-${requestId}`).style.backgroundColor = '#4caf50';
-          } else if (type === 'error') {
-            alert(`エラー: ${message}`);
-            const progressBar = document.querySelector(`#progress-bar-${requestId}`);
-            if (progressBar) progressBar.style.backgroundColor = 'red';
-          }
-        } catch (error) {
-          console.error('WebSocketメッセージの処理中にエラーが発生しました:', error);
-          alert('メッセージの処理中にエラーが発生しました。');
+function setupWebSocket(url) {
+  if (ws) {
+    ws.close();
+  }
+
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    console.log("WebSocket 接続成功: " + url);
+  };
+
+  ws.onclose = () => {
+    console.warn("WebSocket接続が切れました。再接続を試みます...");
+    setTimeout(() => {
+      if (!ws || ws.readyState === WebSocket.CLOSED) {
+        setupWebSocket(url);
+      }
+    }, 5000);
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      const { requestId, type, percentage, files, message } = data;
+
+      if (type === 'progress') {
+        const progressBar = document.querySelector(`#progress-${requestId}`);
+        if (progressBar) {
+          progressBar.style.width = `${percentage}%`;
         }
-      };
+      } else if (type === 'complete') {
+        const linkContainer = document.querySelector(`#link-${requestId}`);
+        if (linkContainer) {
+          if (files && files.length > 0) {
+            const baseHttpUrl = convertWsToHttp(ws.url); // wss:// → https:// に変換
+
+            linkContainer.innerHTML = files
+              .map((file) => {
+                if (!file.fileUrl) {
+                  console.error("無効なファイルURL:", file);
+                  return '<span>無効なURL</span>';
+                }
+
+                let newFileUrl;
+                try {
+                  // 相対URLなら、WebSocketのドメインを基に絶対URLを生成
+                  newFileUrl = new URL(file.fileUrl, baseHttpUrl).href;
+                } catch (error) {
+                  console.error("URLの解析に失敗しました:", file.fileUrl, error);
+                  return '<span>URLの解析に失敗しました</span>';
+                }
+
+                return `<a href="${newFileUrl}" target="_blank" download>${file.fileName}</a>`;
+              })
+              .join('<br>');
+          } else {
+            linkContainer.innerHTML = '<span>ダウンロードされたファイルが見つかりません。</span>';
+          }
+        }
+        document.querySelector(`#progress-bar-${requestId}`).style.backgroundColor = '#4caf50';
+      } else if (type === 'error') {
+        alert(`エラー: ${message}`);
+        const progressBar = document.querySelector(`#progress-bar-${requestId}`);
+        if (progressBar) progressBar.style.backgroundColor = 'red';
+      }
+    } catch (error) {
+      console.error('WebSocketメッセージの処理中にエラーが発生しました:', error);
+      alert('メッセージの処理中にエラーが発生しました。');
     }
+  };
+}
+
+// WebSocketのURLをHTTPSに変換
+function convertWsToHttp(wsUrl) {
+  if (wsUrl.startsWith("wss://")) {
+    return wsUrl.replace("wss://", "https://");
+  }
+  return wsUrl;
+}
+
+
 
     document.getElementById('add-button').addEventListener('click', async () => {
       const url = document.getElementById('url-input').value;
@@ -125,7 +169,7 @@
       const playlistMatch = url.match(/(?:\?|\&)list=([^&]+)/);
       if (playlistMatch) {
         const playlistId = playlistMatch[1];
-        const playlistResponse = await fetch(`/fetch-playlist?playlistId=${playlistId}`);
+        const playlistResponse = await fetch(`https://youtubedownload.psannetwork.net/fetch-playlist?playlistId=${playlistId}`);
         const playlistData = await playlistResponse.json();
         const videos = playlistData.videos;
         document.getElementById('request-list').innerHTML = '';
@@ -169,12 +213,22 @@
       });
     });
 
-    function startDownload(requestId) {
-      const { url, format } = requests[requestId];
-      document.getElementById(`progress-bar-${requestId}`).style.display = 'block';
-      ws.send(JSON.stringify({ requestId, url, format }));
-      disableButtons(true);
+function startDownload(requestId) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.log("WebSocketが接続されていません。再接続を試みます。");
+    const selectedUrl = document.getElementById('ws-url-select').value;
+    if (selectedUrl) {
+      setupWebSocket(selectedUrl);
+      setTimeout(() => startDownload(requestId), 5000); 
     }
+    return;
+  }
+  const { url, format } = requests[requestId];
+  document.getElementById(`progress-bar-${requestId}`).style.display = 'block';
+  ws.send(JSON.stringify({ requestId, url, format }));
+  disableButtons(true);
+}
+
 
     function cleanYouTubeUrl(url) {
       const urlObj = new URL(url);
