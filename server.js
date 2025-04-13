@@ -16,7 +16,7 @@ if (!fs.existsSync(tmpDir)) {
   fs.mkdirSync(tmpDir, { recursive: true });
 }
 
-const tmpCleanupInterval = 600000;
+const tmpCleanupInterval = 1 * 60 * 60 * 1000;
 setInterval(() => {
   fs.readdir(tmpDir, (err, files) => {
     if (err) return;
