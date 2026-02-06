@@ -10,5 +10,9 @@
   {
     "name": "omyu",
     "url": "wss://youtubedl.omyu1116.com"
+  },
+  {
+    "name": "sukru",
+    "url": "wss://yt.sukru.top/"
   }
 ]
