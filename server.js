@@ -44,7 +44,7 @@ function handleDownload(requestId, url, format, ws) {
   const command = format === 'mp4'
     ? `${baseCommand} ${cookieOption} -f bestvideo[ext=mp4]+bestaudio[ext=m4a] --merge-output-format mp4 -o "${outputTemplate}" "${url}"`
     : `${baseCommand} ${cookieOption} -f bestaudio --extract-audio --audio-format mp3 -o "${outputTemplate}" "${url}"`;
-  const process = exec(command);
+  const process = exec(command, console.log);
   process.stdout.on('data', (data) => {
     const match = data.match(/(\d+(\.\d+)?)%/);
     if (match) {
