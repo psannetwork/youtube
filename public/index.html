@@ -169,7 +169,7 @@ function convertWsToHttp(wsUrl) {
       const playlistMatch = url.match(/(?:\?|\&)list=([^&]+)/);
       if (playlistMatch) {
         const playlistId = playlistMatch[1];
-        const playlistResponse = await fetch(`https://youtubedownload.psannetwork.net/fetch-playlist?playlistId=${playlistId}`);
+        const playlistResponse = await fetch(`/fetch-playlist?playlistId=${playlistId}`);
         const playlistData = await playlistResponse.json();
         const videos = playlistData.videos;
         document.getElementById('request-list').innerHTML = '';

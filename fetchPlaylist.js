@@ -1,5 +1,5 @@
 // fetchPlaylist.js
-const ytpl = require('ytpl');
+const ytpl = require('@distube/ytpl');
 
 // プレイリストを取得する関数
 const fetchPlaylist = async (playlistId) => {
