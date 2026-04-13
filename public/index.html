@@ -13,7 +13,6 @@
   <div class="container">
     <h1>📺 YouTube ダウンローダー</h1>
 
-    <!-- WebSocket接続先URL選択UI -->
     <div class="form-group">
       <label for="ws-url-select">🌐 サーバー</label>
       <div class="server-select-wrapper">
@@ -27,13 +26,11 @@
       </div>
     </div>
 
-    <!-- URL入力 -->
     <div class="form-group">
       <label for="url-input">🔗 YouTube URL</label>
       <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=...">
     </div>
 
-    <!-- 形式選択 -->
     <div class="form-group">
       <label for="format-select">📦 デフォルト形式</label>
       <select id="format-select">
@@ -54,7 +51,6 @@
       </select>
     </div>
 
-    <!-- ボタン -->
     <div class="button-row">
       <button id="add-button" class="btn btn-primary btn-block">➕ リストに追加</button>
     </div>
@@ -64,7 +60,6 @@
       <button id="clear-all-button" class="btn btn-danger">🗑️ すべて削除</button>
     </div>
 
-    <!-- ダウンロードリスト -->
     <div class="list-header">
       <h2>📋 ダウンロードリスト (<span id="list-count">0</span>)</h2>
       <input type="text" id="search-box" class="search-box" placeholder="🔍 検索...">
@@ -85,10 +80,8 @@
     let pingInterval = null;
     let reconnectTimer = null;
 
-    // クライアントのバージョン
-    const CLIENT_VERSION = '2.0.0';
+    const CLIENT_VERSION = '2.0.1';
 
-    // 接続状態をUIに反映
     function updateConnectionStatus(status, text) {
       const dot = document.querySelector('#connection-status .status-dot');
       const statusText = document.querySelector('#connection-status .status-text');
@@ -100,8 +93,7 @@
       }
     }
 
-    // バージョンチェック
-    function checkVersion(ws, url) {
+    function checkVersion(ws) {
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('バージョンチェックがタイムアウトしました'));
@@ -127,7 +119,6 @@
               }
             }
           } catch (e) {
-            // ignore non-version messages
           }
         };
 
@@ -136,7 +127,6 @@
       });
     }
 
-    // pingテスト（接続時）
     function pingTest(ws) {
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
@@ -152,7 +142,6 @@
               resolve(true);
             }
           } catch (e) {
-            // ignore
           }
         };
 
@@ -161,14 +150,13 @@
       });
     }
 
-    // ping/pongで死活監視
     function startPing() {
       if (pingInterval) clearInterval(pingInterval);
       pingInterval = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping' }));
         }
-      }, 10000); // 10秒ごと
+      }, 10000);
     }
 
     function stopPing() {
@@ -178,7 +166,6 @@
       }
     }
 
-    // WebSocket URLリストを取得して選択肢を生成
     fetch('url_list.json')
       .then(response => response.json())
       .then(urlList => {
@@ -198,7 +185,6 @@
           }
         });
 
-        // 初期接続
         if (urlList.length > 0) {
           setupWebSocket(urlList[0].url);
           wsSelect.value = urlList[0].url;
@@ -226,24 +212,19 @@
       ws = new WebSocket(url);
 
       ws.onopen = async () => {
-        console.log("WebSocket 接続成功: " + url);
         updateConnectionStatus('connecting', 'バージョン確認中...');
 
         try {
-          const versionResult = await checkVersion(ws, url);
+          const versionResult = await checkVersion(ws);
           if (!versionResult.match) {
-            // バージョン不一致は接続拒否
-            console.error(`バージョン不一致: クライアント=${CLIENT_VERSION}, サーバー=${versionResult.server}`);
             updateConnectionStatus('disconnected', 'バージョン不一致');
             alert(`接続に失敗しました\n\n接続しようとしているサーバーのバージョンが古いため接続できません。\n\nクライアント: v${CLIENT_VERSION}\nサーバー: v${versionResult.server}\n\nサーバー管理者にアップデートを依頼してください。`);
             ws.close();
             return;
           }
 
-          console.log(`バージョン一致: ${versionResult.version}`);
           updateConnectionStatus('connecting', '接続テスト中...');
 
-          // pingテストで応答確認
           const pingOk = await pingTest(ws);
           if (!pingOk) {
             updateConnectionStatus('disconnected', '接続失敗');
@@ -255,14 +236,12 @@
           updateConnectionStatus('connected', `接続済み v${versionResult.version}`);
           startPing();
         } catch (err) {
-          console.error('バージョンチェック失敗:', err.message);
           updateConnectionStatus('disconnected', '接続失敗');
           alert(`接続に失敗しました\n\n${err.message}`);
         }
       };
 
       ws.onclose = () => {
-        console.warn("WebSocket接続が切れました。再接続を試みます...");
         stopPing();
         updateConnectionStatus('reconnecting', '再接続中...');
         reconnectTimer = setTimeout(() => {
@@ -280,9 +259,7 @@
         try {
           const data = JSON.parse(event.data);
 
-          // pong応答を処理
           if (data.type === 'pong') {
-            // 接続生存確認OK（UI更新は不要、エラー時のみ処理）
             return;
           }
 
@@ -303,6 +280,7 @@
             const progressBar = document.querySelector(`#progress-bar-${requestId}`);
             const statusBadge = document.querySelector(`#status-${requestId}`);
             const downloadBtn = document.querySelector(`#download-btn-${requestId}`);
+            const stopBtn = document.querySelector(`#stop-btn-${requestId}`);
 
             if (linkContainer) {
               if (files && files.length > 0) {
@@ -341,15 +319,43 @@
             }
 
             if (downloadBtn) {
-              downloadBtn.disabled = false;
-              downloadBtn.textContent = '⬇️ ダウンロード';
+              downloadBtn.disabled = true;
+              downloadBtn.textContent = '✅ 完了';
+            }
+
+            if (stopBtn) {
+              stopBtn.style.display = 'none';
             }
 
             updateCount();
+          } else if (type === 'stopped') {
+            const statusBadge = document.querySelector(`#status-${requestId}`);
+            const downloadBtn = document.querySelector(`#download-btn-${requestId}`);
+            const stopBtn = document.querySelector(`#stop-btn-${requestId}`);
+            const progressBar = document.querySelector(`#progress-bar-${requestId}`);
+
+            if (statusBadge) {
+              statusBadge.textContent = '停止';
+              statusBadge.className = 'status-badge status-error';
+            }
+
+            if (downloadBtn) {
+              downloadBtn.disabled = false;
+              downloadBtn.textContent = '⬇️ 再ダウンロード';
+            }
+
+            if (stopBtn) {
+              stopBtn.style.display = 'none';
+            }
+
+            if (progressBar) {
+              progressBar.classList.add('error');
+            }
           } else if (type === 'error') {
             const progressBar = document.querySelector(`#progress-bar-${requestId}`);
             const statusBadge = document.querySelector(`#status-${requestId}`);
             const downloadBtn = document.querySelector(`#download-btn-${requestId}`);
+            const stopBtn = document.querySelector(`#stop-btn-${requestId}`);
 
             if (progressBar) {
               progressBar.classList.add('error');
@@ -361,8 +367,12 @@
             }
 
             if (downloadBtn) {
-              downloadBtn.disabled = true;
-              downloadBtn.textContent = '❌ エラー';
+              downloadBtn.disabled = false;
+              downloadBtn.textContent = '⬇️ 再ダウンロード';
+            }
+
+            if (stopBtn) {
+              stopBtn.style.display = 'none';
             }
 
             alert(`エラー: ${message}`);
@@ -381,7 +391,6 @@
     }
 
 
-    // リストに追加
     document.getElementById('add-button').addEventListener('click', async () => {
       const url = document.getElementById('url-input').value.trim();
       const format = document.getElementById('format-select').value;
@@ -395,7 +404,6 @@
       if (playlistMatch) {
         const playlistId = playlistMatch[1];
 
-        // ラジオミックス（RD始まり）はプレイリスト取得をスキップ
         if (playlistId.startsWith('RD')) {
           const cleanedUrl = cleanYouTubeUrl(url);
           const requestId = ++requestIdCounter;
@@ -427,7 +435,6 @@
         const requestId = ++requestIdCounter;
         requests[requestId] = { url: cleanedUrl, format };
 
-        // タイトル取得を試みる（簡易表示）
         const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
         const title = videoIdMatch ? `Video ${videoIdMatch[1]}` : cleanedUrl;
         addItemToList(requestId, title, format);
@@ -471,6 +478,7 @@
           </div>
           <div class="item-actions">
             <button id="download-btn-${requestId}" class="btn btn-sm btn-primary" onclick="startDownload(${requestId})">⬇️ ダウンロード</button>
+            <button id="stop-btn-${requestId}" class="btn btn-sm btn-danger" onclick="stopDownload(${requestId})" style="display:none;">⏹ 停止</button>
             <button class="btn btn-sm btn-danger" onclick="removeItem(${requestId})">✕</button>
           </div>
         </div>
@@ -499,7 +507,6 @@
       }
     }
 
-    // アイテムの形式を変更
     function changeItemFormat(requestId) {
       const select = document.getElementById(`format-select-${requestId}`);
       if (select && requests[requestId]) {
@@ -507,7 +514,6 @@
       }
     }
 
-    // すべて削除
     function clearAll() {
       if (Object.keys(requests).length === 0) return;
       if (!confirm('すべてのアイテムを削除しますか？')) return;
@@ -529,7 +535,6 @@
       document.getElementById('list-count').textContent = Object.keys(requests).length;
     }
 
-    // 検索機能
     document.getElementById('search-box').addEventListener('input', (e) => {
       const query = e.target.value.toLowerCase();
       const items = document.querySelectorAll('#request-list li');
@@ -540,7 +545,6 @@
       });
     });
 
-    // 一括ダウンロード
     document.getElementById('download-all-button').addEventListener('click', () => {
       const pendingRequests = Object.keys(requests).filter(id => {
         const statusBadge = document.querySelector(`#status-${id}`);
@@ -557,7 +561,6 @@
       });
     });
 
-    // 完了アイテムを削除
     document.getElementById('clear-completed-button').addEventListener('click', () => {
       const items = document.querySelectorAll('#request-list li');
       items.forEach(item => {
@@ -570,12 +573,10 @@
       updateCount();
     });
 
-    // すべて削除
     document.getElementById('clear-all-button').addEventListener('click', clearAll);
 
     function startDownload(requestId) {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
-        console.log("WebSocketが接続されていません。再接続を試みます。");
         const selectedUrl = document.getElementById('ws-url-select').value;
         if (selectedUrl) {
           setupWebSocket(selectedUrl);
@@ -585,14 +586,36 @@
         }
         return;
       }
-      const { url, format, quality } = requests[requestId];
+      const { url, format } = requests[requestId];
       const statusBadge = document.querySelector(`#status-${requestId}`);
       if (statusBadge) {
         statusBadge.textContent = 'ダウンロード中...';
         statusBadge.className = 'status-badge status-downloading';
       }
 
-      ws.send(JSON.stringify({ requestId, url, format, quality }));
+      const downloadBtn = document.querySelector(`#download-btn-${requestId}`);
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = '⏳ 処理中...';
+      }
+
+      const stopBtn = document.querySelector(`#stop-btn-${requestId}`);
+      if (stopBtn) {
+        stopBtn.style.display = 'inline-flex';
+      }
+
+      ws.send(JSON.stringify({ requestId, url, format }));
+    }
+
+    function stopDownload(requestId) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: 'stop_download', requestId }));
+
+      const stopBtn = document.querySelector(`#stop-btn-${requestId}`);
+      if (stopBtn) {
+        stopBtn.disabled = true;
+        stopBtn.textContent = '⏹ 停止中...';
+      }
     }
 
 

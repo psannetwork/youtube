@@ -1,7 +1,5 @@
-// fetchPlaylist.js
 const { spawn } = require('child_process');
 
-// プレイリストを取得する関数（yt-dlp直接使用）
 const fetchPlaylist = async (playlistId) => {
     return new Promise((resolve, reject) => {
         const args = [

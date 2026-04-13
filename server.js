@@ -18,13 +18,13 @@ if (!fs.existsSync(tmpDir)) {
   fs.mkdirSync(tmpDir, { recursive: true });
 }
 
-// tmpディレクトリの容量を監視・制限（デフォルト: 5GB）
 const MAX_TMP_SIZE = parseInt(process.env.MAX_TMP_SIZE_GB) * 1024 * 1024 * 1024 || 5 * 1024 * 1024 * 1024;
 
-// 定期的にtmpディレクトリをクリーンアップ
+const activeDownloads = new Map();
+
 setInterval(() => {
   cleanupTmp();
-}, 30 * 60 * 1000); // 30分ごと
+}, 30 * 60 * 1000);
 
 function cleanupTmp() {
   fs.readdir(tmpDir, (err, files) => {
@@ -33,7 +33,6 @@ function cleanupTmp() {
     let totalSize = 0;
     const fileStats = [];
 
-    // 各ファイルのサイズと最終アクセス時間を取得
     files.forEach(file => {
       const filePath = path.join(tmpDir, file);
       try {
@@ -47,28 +46,21 @@ function cleanupTmp() {
           fileStats.push({ path: filePath, size: stat.size, mtime: stat.mtimeMs });
         }
       } catch (e) {
-        // ignore
       }
     });
 
-    // 容量制限を超えている場合、古いファイルから削除
     if (totalSize > MAX_TMP_SIZE) {
-      console.log(`tmp容量が制限値を超えました (${(totalSize / 1024 / 1024 / 1024).toFixed(2)}GB)`);
       fileStats.sort((a, b) => a.mtime - b.mtime);
-
       for (const fileStat of fileStats) {
-        if (totalSize <= MAX_TMP_SIZE * 0.7) break; // 70%まで削除
+        if (totalSize <= MAX_TMP_SIZE * 0.7) break;
         try {
           fs.rmSync(fileStat.path, { recursive: true, force: true });
           totalSize -= fileStat.size;
-          console.log(`削除: ${fileStat.path}`);
         } catch (e) {
-          // ignore
         }
       }
     }
 
-    // 24時間以上経過したファイルを削除
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
     files.forEach(file => {
@@ -77,10 +69,8 @@ function cleanupTmp() {
         const stat = fs.statSync(filePath);
         if (now - stat.mtimeMs > oneDay) {
           fs.rmSync(filePath, { recursive: true, force: true });
-          console.log(`期限切れ削除: ${filePath}`);
         }
       } catch (e) {
-        // ignore
       }
     });
   });
@@ -96,13 +86,13 @@ function getDirSize(dirPath) {
       size += stat.isDirectory() ? getDirSize(filePath) : stat.size;
     });
   } catch (e) {
-    // ignore
   }
   return size;
 }
 
+const VALID_FORMATS = ['mp4', 'mp4_720', 'mp4_480', 'mkv', 'mp3', 'mp3_128', 'wav', 'flac', 'aac', 'opus'];
+
 wss.on('connection', (ws) => {
-  // ping/pong対応
   ws.isAlive = true;
   ws.on('pong', () => {
     ws.isAlive = true;
@@ -112,7 +102,6 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(message);
 
-      // バージョンチェック
       if (data.type === 'version_check') {
         ws.send(JSON.stringify({
           type: 'version_info',
@@ -121,7 +110,6 @@ wss.on('connection', (ws) => {
         return;
       }
 
-      // ping対応
       if (data.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
         return;
@@ -136,9 +124,42 @@ wss.on('connection', (ws) => {
         return;
       }
 
-      // 2. ダウンロード実行リクエスト
-      const { url, format, quality, requestId } = data;
-      handleDownload(requestId, url, format, quality, ws);
+      if (data.type === 'stop_download') {
+        const { requestId } = data;
+        const download = activeDownloads.get(requestId);
+        if (download) {
+          if (download.child && download.child.pid) {
+            try {
+              process.kill(-download.child.pid, 'SIGTERM');
+            } catch (e) {
+            }
+          }
+          download.stopped = true;
+          try {
+            fs.rmSync(download.randomDir, { recursive: true, force: true });
+          } catch (e) {
+          }
+          activeDownloads.delete(requestId);
+          ws.send(JSON.stringify({ type: 'stopped', requestId }));
+        }
+        return;
+      }
+
+      const { url, format, requestId } = data;
+
+      if (!requestId || typeof requestId !== 'number') {
+        return ws.send(JSON.stringify({ type: 'error', message: '無効なリクエストIDです' }));
+      }
+
+      if (!url || typeof url !== 'string') {
+        return ws.send(JSON.stringify({ type: 'error', requestId, message: 'URLが必要です' }));
+      }
+
+      if (!format || !VALID_FORMATS.includes(format)) {
+        return ws.send(JSON.stringify({ type: 'error', requestId, message: '無効な形式です' }));
+      }
+
+      handleDownload(requestId, url, format, ws);
 
     } catch (err) {
       ws.send(JSON.stringify({ type: 'error', message: 'リクエストの解析に失敗しました' }));
@@ -146,9 +167,8 @@ wss.on('connection', (ws) => {
   });
 });
 
-function handleDownload(requestId, url, format, quality, ws) {
+function handleDownload(requestId, url, format, ws) {
 
-  // URLの厳格な検証
   try {
     const urlObj = new URL(url);
     const allowedHosts = ['www.youtube.com', 'youtube.com', 'youtu.be', 'm.youtube.com'];
@@ -163,15 +183,14 @@ function handleDownload(requestId, url, format, quality, ws) {
   const randomDir = path.join(tmpDir, randomDirName);
   fs.mkdirSync(randomDir, { recursive: true });
 
-
-  // 形式に応じた引数設定
-  const formatArgs = getFormatArgs(format, quality);
+  const formatArgs = getFormatArgs(format);
   const args = [
     '--no-playlist',
     ...formatArgs.ytDlpFormat,
     '-o', `${randomDir}/%(title)s.%(ext)s`,
     '--no-mtime',
     ...formatArgs.extraArgs || [],
+    '--no-check-certificates',
     url
   ];
 
@@ -179,8 +198,9 @@ function handleDownload(requestId, url, format, quality, ws) {
     args.push('--cookies', 'cookie.txt');
   }
 
+  const child = spawn('yt-dlp', args, { detached: true });
 
-  const child = spawn('yt-dlp', args);
+  activeDownloads.set(requestId, { child, randomDir, stopped: false });
 
   child.stdout.on('data', (data) => {
     const match = data.toString().match(/(\d+(\.\d+)?)%/);
@@ -190,9 +210,16 @@ function handleDownload(requestId, url, format, quality, ws) {
   });
 
   child.on('close', (code) => {
+    const download = activeDownloads.get(requestId);
+    if (!download) return;
+
+    if (download.stopped) {
+      activeDownloads.delete(requestId);
+      return;
+    }
+
     if (code === 0) {
       const files = fs.readdirSync(randomDir).map((file) => {
-        // 削除
         const safeFileName = file.replace(/[\/\\:*?"<>|]/g, '_');
         return {
           fileName: safeFileName,
@@ -201,25 +228,25 @@ function handleDownload(requestId, url, format, quality, ws) {
       });
       ws.send(JSON.stringify({ type: 'complete', requestId, files }));
 
-      // ダウンロード完了後、5分でファイル削除（容量節約）
       setTimeout(() => {
         fs.rmSync(randomDir, { recursive: true, force: true });
+        activeDownloads.delete(requestId);
       }, 300000);
     } else {
       ws.send(JSON.stringify({ type: 'error', requestId, message: 'yt-dlpがエラーを返しました' }));
       fs.rmSync(randomDir, { recursive: true, force: true });
+      activeDownloads.delete(requestId);
     }
+  });
+
+  child.on('error', (err) => {
+    ws.send(JSON.stringify({ type: 'error', requestId, message: 'ダウンロードの起動に失敗しました' }));
+    fs.rmSync(randomDir, { recursive: true, force: true });
+    activeDownloads.delete(requestId);
   });
 }
 
-// 形式に応じた引数を返す
-function getFormatArgs(format, quality) {
-  const qualityMap = {
-    best: 'best',
-    good: 'best',
-    normal: 'best'
-  };
-
+function getFormatArgs(format) {
   switch (format) {
     case 'mp4':
       return {
@@ -283,15 +310,12 @@ function generateRandomString(length) {
   return require('crypto').randomBytes(length).toString('hex').slice(0, length);
 }
 
-// でぃれくととらばーさる？を無効に
 app.get('/download/:dir/:file', (req, res) => {
   const { dir, file } = req.params;
-  // path.basename
   const safeDir = path.basename(dir);
   const safeFile = path.basename(file);
   const filePath = path.join(tmpDir, safeDir, safeFile);
 
-  // tmpDirの外へのアクセスを拒否
   if (!filePath.startsWith(path.resolve(tmpDir))) {
     return res.status(403).send('Access denied');
   }
@@ -305,7 +329,6 @@ app.get('/download/:dir/:file', (req, res) => {
 
 app.use(express.static('public'));
 
-// プレイリスト取得用HTTPエンドポイント
 app.get('/fetch-playlist', async (req, res) => {
   try {
     const { playlistId } = req.query;
@@ -313,7 +336,6 @@ app.get('/fetch-playlist', async (req, res) => {
       return res.status(400).json({ error: 'playlistIdが必要です' });
     }
 
-    // プレイリストIDのバリデーション（英数字のみ）
     if (!/^[a-zA-Z0-9_-]+$/.test(playlistId)) {
       return res.status(400).json({ error: '無効なplaylistIdです' });
     }
@@ -326,7 +348,6 @@ app.get('/fetch-playlist', async (req, res) => {
   }
 });
 
-// バージョンチェック用エンドポイント
 app.get('/api/version', (req, res) => {
   res.json({ version: packageJson.version });
 });
