@@ -39,7 +39,7 @@ function handleWebSocketData(data) {
               return '<span>URLの解析に失敗しました</span>';
             }
 
-            return `<a href="${newFileUrl}" download>${file.fileName}</a>`;
+            return `<a href="${escapeHtml(newFileUrl)}" download>${escapeHtml(file.fileName)}</a>`;
           })
           .join('');
       } else {

@@ -22,13 +22,34 @@ function showConfirm(message) {
     toast.style.flexDirection = 'column';
     toast.style.gap = '12px';
     toast.style.alignItems = 'stretch';
-    toast.innerHTML = `<div>${message}</div><div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-sm btn-danger confirm-cancel">キャンセル</button><button class="btn btn-sm btn-success confirm-ok">OK</button></div>`;
+
+    const msgDiv = document.createElement('div');
+    msgDiv.textContent = message;
+    toast.appendChild(msgDiv);
+
+    const btnContainer = document.createElement('div');
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '8px';
+    btnContainer.style.justifyContent = 'flex-end';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-sm btn-danger confirm-cancel';
+    cancelBtn.textContent = 'キャンセル';
+    btnContainer.appendChild(cancelBtn);
+
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn btn-sm btn-success confirm-ok';
+    okBtn.textContent = 'OK';
+    btnContainer.appendChild(okBtn);
+
+    toast.appendChild(btnContainer);
     container.appendChild(toast);
-    toast.querySelector('.confirm-ok').addEventListener('click', () => {
+
+    okBtn.addEventListener('click', () => {
       toast.remove();
       resolve(true);
     });
-    toast.querySelector('.confirm-cancel').addEventListener('click', () => {
+    cancelBtn.addEventListener('click', () => {
       toast.remove();
       resolve(false);
     });

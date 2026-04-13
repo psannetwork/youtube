@@ -1,10 +1,17 @@
 const { spawn } = require('child_process');
 
+const PLAYLIST_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
+const SEPARATOR = '|||';
+
 const fetchPlaylist = async (playlistId) => {
     return new Promise((resolve, reject) => {
+        if (!PLAYLIST_ID_REGEX.test(playlistId)) {
+            return reject(new Error('無効なplaylistIdです'));
+        }
+
         const args = [
             '--flat-playlist',
-            '--print', '%(id)s|%(title)s|%(url)s',
+            '--print', `%(id)s${SEPARATOR}%(title)s${SEPARATOR}%(url)s`,
             `https://www.youtube.com/playlist?list=${playlistId}`
         ];
 
@@ -25,9 +32,10 @@ const fetchPlaylist = async (playlistId) => {
                 const videos = output
                     .trim()
                     .split('\n')
-                    .filter(line => line.includes('|'))
+                    .filter(line => line.includes(SEPARATOR))
                     .map(line => {
-                        const [id, title, url] = line.split('|');
+                        const parts = line.split(SEPARATOR);
+                        const [id, title, url] = parts;
                         return {
                             id,
                             title: title || `Video ${id}`,
@@ -52,7 +60,7 @@ const fetchChannelPlaylists = async (channelUrl) => {
     return new Promise((resolve, reject) => {
         const args = [
             '--flat-playlist',
-            '--print', '%(id)s|%(title)s|%(url)s',
+            '--print', `%(id)s${SEPARATOR}%(title)s${SEPARATOR}%(url)s`,
             channelUrl
         ];
 
@@ -73,9 +81,10 @@ const fetchChannelPlaylists = async (channelUrl) => {
                 const playlists = output
                     .trim()
                     .split('\n')
-                    .filter(line => line.includes('|'))
+                    .filter(line => line.includes(SEPARATOR))
                     .map(line => {
-                        const [id, title, url] = line.split('|');
+                        const parts = line.split(SEPARATOR);
+                        const [id, title, url] = parts;
                         return {
                             id,
                             title: title || `Playlist ${id}`,

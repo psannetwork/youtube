@@ -6,7 +6,7 @@ async function handleAddButton() {
   const url = document.getElementById('url-input').value.trim();
   const format = document.getElementById('format-select').value;
 
-  if (!url || !/^https?:\/\/(www\.)?youtube\.com\/|youtu\.be\//.test(url)) {
+  if (!url || !/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/|youtu\.be\/)/.test(url)) {
     showToast('正しいYouTube URLを入力してください', 'error');
     return;
   }

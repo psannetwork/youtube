@@ -4,13 +4,37 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const { fetchPlaylist, fetchChannelPlaylists } = require('./fetchPlaylist');
 const packageJson = require('./package.json');
+const urlList = require('./public/url_list.json');
 
 const app = express();
 const port = 3020;
-const wss = new WebSocket.Server({ noServer: true });
+const wss = new WebSocket.Server({ noServer: true, maxPayload: 10 * 1024 }); // 10KB制限
+
+// URLリストからWebSocketサーバーのドメインを抽出
+const allowedWsDomains = urlList.map((item) => {
+  try {
+    return new URL(item.url).origin;
+  } catch {
+    return null;
+  }
+}).filter(Boolean);
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", ...allowedWsDomains],
+      imgSrc: ["'self'", 'data:'],
+      mediaSrc: ["'self'"],
+    }
+  }
+}));
 app.use(cors());
 
 const tmpDir = path.join(__dirname, 'tmp');
@@ -92,6 +116,20 @@ function getDirSize(dirPath) {
 
 const VALID_FORMATS = ['mp4', 'mp4_720', 'mp4_480', 'mkv', 'mp3', 'mp3_128', 'wav', 'flac', 'aac', 'opus'];
 
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', () => {
+  clearInterval(heartbeatInterval);
+});
+
 wss.on('connection', (ws) => {
   ws.isAlive = true;
   ws.on('pong', () => {
@@ -118,6 +156,9 @@ wss.on('connection', (ws) => {
       if (data.type === 'fetch_playlist') {
         const playlistId = new URL(data.url).searchParams.get('list');
         if (!playlistId) throw new Error('Invalid Playlist URL');
+        if (!/^[a-zA-Z0-9_-]+$/.test(playlistId)) {
+          throw new Error('無効なplaylistIdです');
+        }
 
         const videos = await fetchPlaylist(playlistId);
         ws.send(JSON.stringify({ type: 'playlist_info', videos }));
@@ -190,12 +231,25 @@ function handleDownload(requestId, url, format, ws) {
     '-o', `${randomDir}/%(title)s.%(ext)s`,
     '--no-mtime',
     ...formatArgs.extraArgs || [],
-    '--no-check-certificates',
-    url
   ];
 
+  if (process.env.NO_CHECK_CERTIFICATES === 'true') {
+    args.push('--no-check-certificates');
+  }
+
+  args.push(url);
+
   if (fs.existsSync('cookie.txt')) {
-    args.push('--cookies', 'cookie.txt');
+    try {
+      const stat = fs.statSync('cookie.txt');
+      const mode = stat.mode & 0o777;
+      if (mode > 0o600) {
+        console.warn('警告: cookie.txtのパーミッションが安全ではありません。chmod 600を推奨します。');
+      }
+      args.push('--cookies', 'cookie.txt');
+    } catch (e) {
+      console.warn('cookie.txtの読み込みに失敗しました:', e.message);
+    }
   }
 
   const child = spawn('yt-dlp', args, { detached: true });
@@ -307,16 +361,17 @@ function getFormatArgs(format) {
 }
 
 function generateRandomString(length) {
-  return require('crypto').randomBytes(length).toString('hex').slice(0, length);
+  return require('crypto').randomBytes(Math.ceil(length * 3 / 4)).toString('base64url').slice(0, length);
 }
 
 app.get('/download/:dir/:file', (req, res) => {
   const { dir, file } = req.params;
   const safeDir = path.basename(dir);
   const safeFile = path.basename(file);
-  const filePath = path.join(tmpDir, safeDir, safeFile);
+  const resolvedTmpDir = path.resolve(tmpDir);
+  const filePath = path.join(resolvedTmpDir, safeDir, safeFile);
 
-  if (!filePath.startsWith(path.resolve(tmpDir))) {
+  if (!filePath.startsWith(resolvedTmpDir + path.sep)) {
     return res.status(403).send('Access denied');
   }
 
@@ -327,7 +382,7 @@ app.get('/download/:dir/:file', (req, res) => {
   }
 });
 
-app.use(express.static('public'));
+app.use(express.static('public', { dotfiles: 'ignore' }));
 
 app.get('/fetch-playlist', async (req, res) => {
   try {
@@ -344,7 +399,7 @@ app.get('/fetch-playlist', async (req, res) => {
     res.json({ videos });
   } catch (err) {
     console.error('Playlist fetch error:', err.message);
-    res.status(500).json({ error: err.message || 'プレイリストの取得に失敗しました' });
+    res.status(500).json({ error: 'プレイリストの取得に失敗しました' });
   }
 });
 
@@ -367,7 +422,7 @@ app.get('/fetch-channel-playlists', async (req, res) => {
     res.json({ playlists });
   } catch (err) {
     console.error('Channel playlist fetch error:', err.message);
-    res.status(500).json({ error: err.message || 'チャンネルのプレイリスト取得に失敗しました' });
+    res.status(500).json({ error: 'チャンネルのプレイリスト取得に失敗しました' });
   }
 });
 
@@ -376,6 +431,21 @@ const server = app.listen(port, () => {
 });
 
 server.on('upgrade', (req, socket, head) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    try {
+      const originUrl = new URL(origin);
+      const originOrigin = originUrl.origin;
+      if (!allowedWsDomains.includes(originOrigin)) {
+        socket.destroy();
+        return;
+      }
+    } catch {
+      socket.destroy();
+      return;
+    }
+  }
+
   wss.handleUpgrade(req, socket, head, (ws) => {
     wss.emit('connection', ws, req);
   });
