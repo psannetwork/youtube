@@ -15,9 +15,11 @@ const port = 3020;
 const wss = new WebSocket.Server({ noServer: true, maxPayload: 10 * 1024 }); // 10KB制限
 
 // URLリストからWebSocketサーバーのドメインを抽出
+// クライアントのoriginは https:// なので、wss:// を https:// に変換して比較
 const allowedWsDomains = urlList.map((item) => {
   try {
-    return new URL(item.url).origin;
+    const url = item.url.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://');
+    return new URL(url).origin;
   } catch {
     return null;
   }
@@ -27,13 +29,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      "script-src": ["'self'", "https://static.cloudflareinsights.com", "'unsafe-inline'"],
+      "script-src-attr": ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", ...allowedWsDomains],
+      "connectSrc": ["'self'", 'ws:', 'wss:'],
       imgSrc: ["'self'", 'data:'],
       mediaSrc: ["'self'"],
-    }
-  }
+    }  }
 }));
 app.use(cors());
 
