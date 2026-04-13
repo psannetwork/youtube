@@ -19,4 +19,37 @@ The following terms apply to the use of the programs, documentation, and associa
 4. **Disclaimer**: The Software is provided "as is", without warranty of any kind, express or implied. The author shall not be liable for any damages arising in connection with the use of the Software.
 
 ---
-© 2026 @psannetwork. All rights reserved.
+
+## Third-Party Licenses
+
+本ソフトウェアは、以下のオープンソースプロジェクトを利用しています。
+
+### yt-dlp
+
+yt-dlp is licensed under **The Unlicense** (public domain).
+
+```
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this software,
+either in source code form or as a compiled binary, for any purpose, commercial or non-commercial,
+and by any means.
+```
+
+Source: https://github.com/yt-dlp/yt-dlp
+
+### FFmpeg
+
+FFmpeg is licensed under the **GNU Lesser General Public License (LGPL) version 2.1 or later**.
+
+Depending on configuration, FFmpeg may also incorporate optional components licensed under the
+**GNU General Public License (GPL) version 2 or later**. When such components are used, the
+entire FFmpeg binary is subject to the GPL.
+
+Full license texts:
+- LGPL v2.1: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+- GPL v2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+Source: https://www.ffmpeg.org/legal.html
+
+---
+© 2023-2026 @psannetwork. All rights reserved.

@@ -75,6 +75,7 @@ async function handleAddButton() {
 }
 
 function startDownload(requestId) {
+  requestId = Number(requestId);
   const ws = getWebSocket();
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     const selectedUrl = getSelectedWsUrl();
