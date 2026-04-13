@@ -145,6 +145,31 @@
       });
     }
 
+    // pingテスト（接続時）
+    function pingTest(ws) {
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve(false);
+        }, 5000);
+
+        const handler = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'pong') {
+              ws.removeEventListener('message', handler);
+              clearTimeout(timeout);
+              resolve(true);
+            }
+          } catch (e) {
+            // ignore
+          }
+        };
+
+        ws.addEventListener('message', handler);
+        ws.send(JSON.stringify({ type: 'ping' }));
+      });
+    }
+
     // ping/pongで死活監視
     function startPing() {
       if (pingInterval) clearInterval(pingInterval);
@@ -216,18 +241,32 @@
         try {
           const versionResult = await checkVersion(ws, url);
           if (!versionResult.match) {
-            console.warn(versionResult.message);
-            updateConnectionStatus('connected', `接続済み (⚠️バージョン不一致)`);
-            alert(`警告: ${versionResult.message}\n一部の機能が正常に動作しない可能性があります。`);
-          } else {
-            console.log(`バージョン一致: ${versionResult.version}`);
-            updateConnectionStatus('connected', `接続済み v${versionResult.version}`);
+            // バージョン不一致は接続拒否
+            console.error(`バージョン不一致: クライアント=${CLIENT_VERSION}, サーバー=${versionResult.server}`);
+            updateConnectionStatus('disconnected', 'バージョン不一致');
+            alert(`接続に失敗しました\n\n接続しようとしているサーバーのバージョンが古いため接続できません。\n\nクライアント: v${CLIENT_VERSION}\nサーバー: v${versionResult.server}\n\nサーバー管理者にアップデートを依頼してください。`);
+            ws.close();
+            return;
           }
+
+          console.log(`バージョン一致: ${versionResult.version}`);
+          updateConnectionStatus('connecting', '接続テスト中...');
+
+          // pingテストで応答確認
+          const pingOk = await pingTest(ws);
+          if (!pingOk) {
+            updateConnectionStatus('disconnected', '接続失敗');
+            alert('接続に失敗しました\n\nサーバーとの通信が確立できませんでした。\nネットワーク接続を確認するか、サーバー管理者に連絡してください。');
+            ws.close();
+            return;
+          }
+
+          updateConnectionStatus('connected', `接続済み v${versionResult.version}`);
           startPing();
         } catch (err) {
           console.error('バージョンチェック失敗:', err.message);
-          updateConnectionStatus('connected', '接続済み (バージョン不明)');
-          startPing();
+          updateConnectionStatus('disconnected', '接続失敗');
+          alert(`接続に失敗しました\n\n${err.message}`);
         }
       };
 
