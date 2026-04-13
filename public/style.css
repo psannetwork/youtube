@@ -1,17 +1,17 @@
 :root {
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
+  --primary: #1a1a1a;
+  --primary-hover: #333333;
   --success: #10b981;
   --danger: #ef4444;
   --danger-hover: #dc2626;
-  --bg: #f8fafc;
+  --bg: #f5f5f5;
   --card-bg: #ffffff;
-  --text: #1e293b;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
-  --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-  --radius: 8px;
+  --text: #1a1a1a;
+  --text-secondary: #6b7280;
+  --border: #e5e5e5;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+  --radius: 6px;
 }
 
 * {
@@ -160,23 +160,26 @@ input::placeholder {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 20px;
-  border: none;
+  padding: 9px 18px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
+  background-color: #ffffff;
+  color: var(--text);
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .btn-primary {
   background-color: var(--primary);
   color: #fff;
+  border-color: var(--primary);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -186,19 +189,23 @@ input::placeholder {
 .btn-success {
   background-color: var(--success);
   color: #fff;
+  border-color: var(--success);
 }
 
 .btn-success:hover:not(:disabled) {
   background-color: #059669;
+  border-color: #059669;
 }
 
 .btn-danger {
-  background-color: var(--danger);
-  color: #fff;
+  background-color: #ffffff;
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background-color: var(--danger-hover);
+  background-color: var(--danger);
+  color: #fff;
 }
 
 .btn-sm {
@@ -378,7 +385,7 @@ li .item-actions {
 
 .progress {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary), #818cf8);
+  background: var(--primary);
   width: 0%;
   transition: width 0.3s ease;
   border-radius: 4px;
@@ -401,17 +408,17 @@ li .item-actions {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: var(--success);
+  background-color: var(--primary);
   color: #fff;
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 0.85rem;
   font-weight: 500;
-  transition: background-color 0.2s;
+  transition: background-color 0.15s;
 }
 
 .link-container a:hover {
-  background-color: #059669;
+  background-color: var(--primary-hover);
 }
 
 .empty-list {
