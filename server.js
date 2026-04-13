@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 
-const fetchPlaylist = require('./fetchPlaylist');
+const { fetchPlaylist, fetchChannelPlaylists } = require('./fetchPlaylist');
 const packageJson = require('./package.json');
 
 const app = express();
@@ -350,6 +350,25 @@ app.get('/fetch-playlist', async (req, res) => {
 
 app.get('/api/version', (req, res) => {
   res.json({ version: packageJson.version });
+});
+
+app.get('/fetch-channel-playlists', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).json({ error: 'URLが必要です' });
+    }
+
+    if (!/^https?:\/\/(www\.)?youtube\.com\//.test(url)) {
+      return res.status(400).json({ error: 'YouTubeのURLのみ許可されています' });
+    }
+
+    const playlists = await fetchChannelPlaylists(url);
+    res.json({ playlists });
+  } catch (err) {
+    console.error('Channel playlist fetch error:', err.message);
+    res.status(500).json({ error: err.message || 'チャンネルのプレイリスト取得に失敗しました' });
+  }
 });
 
 const server = app.listen(port, () => {

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="toast-container"></div>
   <div class="container">
     <h1>📺 YouTube ダウンローダー</h1>
 
@@ -81,6 +82,18 @@
     let reconnectTimer = null;
 
     const CLIENT_VERSION = '2.0.1';
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
 
     function updateConnectionStatus(status, text) {
       const dot = document.querySelector('#connection-status .status-dot');
@@ -218,7 +231,7 @@
           const versionResult = await checkVersion(ws);
           if (!versionResult.match) {
             updateConnectionStatus('disconnected', 'バージョン不一致');
-            alert(`接続に失敗しました\n\n接続しようとしているサーバーのバージョンが古いため接続できません。\n\nクライアント: v${CLIENT_VERSION}\nサーバー: v${versionResult.server}\n\nサーバー管理者にアップデートを依頼してください。`);
+            showToast(`バージョンが一致しません (クライアント: ${CLIENT_VERSION} / サーバー: ${versionResult.server})`, 'error');
             ws.close();
             return;
           }
@@ -228,7 +241,7 @@
           const pingOk = await pingTest(ws);
           if (!pingOk) {
             updateConnectionStatus('disconnected', '接続失敗');
-            alert('接続に失敗しました\n\nサーバーとの通信が確立できませんでした。\nネットワーク接続を確認するか、サーバー管理者に連絡してください。');
+            showToast('サーバーとの通信が確立できませんでした', 'error');
             ws.close();
             return;
           }
@@ -237,7 +250,7 @@
           startPing();
         } catch (err) {
           updateConnectionStatus('disconnected', '接続失敗');
-          alert(`接続に失敗しました\n\n${err.message}`);
+          showToast(`接続に失敗しました: ${err.message}`, 'error');
         }
       };
 
@@ -375,7 +388,7 @@
               stopBtn.style.display = 'none';
             }
 
-            alert(`エラー: ${message}`);
+            showToast(`エラー: ${message}`, 'error');
           }
         } catch (error) {
           console.error('WebSocketメッセージの処理中にエラーが発生しました:', error);
@@ -396,48 +409,81 @@
       const format = document.getElementById('format-select').value;
 
       if (!url || !/^https?:\/\/(www\.)?youtube\.com\/|youtu\.be\//.test(url)) {
-        alert('正しいYouTube URLを入力してください');
+        showToast('正しいYouTube URLを入力してください', 'error');
         return;
       }
 
-      const playlistMatch = url.match(/(?:\?|\&)list=([^&]+)/);
-      if (playlistMatch) {
-        const playlistId = playlistMatch[1];
+      if (url.includes('/playlists')) {
+        try {
+          const response = await fetch(`/fetch-channel-playlists?url=${encodeURIComponent(url)}`);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'チャンネルのプレイリスト取得に失敗しました');
+          }
+          const data = await response.json();
+          const playlists = data.playlists;
 
-        if (playlistId.startsWith('RD')) {
+          for (const playlist of playlists) {
+            const playlistId = playlist.id;
+            try {
+              const playlistResponse = await fetch(`/fetch-playlist?playlistId=${playlistId}`);
+              if (!playlistResponse.ok) continue;
+              const playlistData = await playlistResponse.json();
+              const videos = playlistData.videos;
+
+              videos.forEach((video) => {
+                const cleanedUrl = cleanYouTubeUrl(video.url);
+                const requestId = ++requestIdCounter;
+                requests[requestId] = { url: cleanedUrl, format };
+                addItemToList(requestId, `[${playlist.title}] ${video.title}`, format);
+              });
+            } catch (err) {
+              console.error(`プレイリスト取得エラー (${playlist.title}):`, err.message);
+            }
+          }
+        } catch (err) {
+          showToast(`チャンネルのプレイリスト取得エラー: ${err.message}`, 'error');
+        }
+      } else {
+        const playlistMatch = url.match(/(?:\?|\&)list=([^&]+)/);
+        if (playlistMatch) {
+          const playlistId = playlistMatch[1];
+
+          if (playlistId.startsWith('RD')) {
+            const cleanedUrl = cleanYouTubeUrl(url);
+            const requestId = ++requestIdCounter;
+            requests[requestId] = { url: cleanedUrl, format };
+            addItemToList(requestId, 'ラジオミックス', format);
+            return;
+          }
+
+          try {
+            const playlistResponse = await fetch(`/fetch-playlist?playlistId=${playlistId}`);
+            if (!playlistResponse.ok) {
+              const errorData = await playlistResponse.json();
+              throw new Error(errorData.error || 'プレイリストの取得に失敗しました');
+            }
+            const playlistData = await playlistResponse.json();
+            const videos = playlistData.videos;
+
+            videos.forEach((video) => {
+              const cleanedUrl = cleanYouTubeUrl(video.url);
+              const requestId = ++requestIdCounter;
+              requests[requestId] = { url: cleanedUrl, format };
+              addItemToList(requestId, video.title, format);
+            });
+          } catch (err) {
+            showToast(`プレイリスト取得エラー: ${err.message}`, 'error');
+          }
+        } else {
           const cleanedUrl = cleanYouTubeUrl(url);
           const requestId = ++requestIdCounter;
           requests[requestId] = { url: cleanedUrl, format };
-          addItemToList(requestId, 'ラジオミックス', format);
-          return;
+
+          const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+          const title = videoIdMatch ? `Video ${videoIdMatch[1]}` : cleanedUrl;
+          addItemToList(requestId, title, format);
         }
-
-        try {
-          const playlistResponse = await fetch(`/fetch-playlist?playlistId=${playlistId}`);
-          if (!playlistResponse.ok) {
-            const errorData = await playlistResponse.json();
-            throw new Error(errorData.error || 'プレイリストの取得に失敗しました');
-          }
-          const playlistData = await playlistResponse.json();
-          const videos = playlistData.videos;
-
-          videos.forEach((video) => {
-            const cleanedUrl = cleanYouTubeUrl(video.url);
-            const requestId = ++requestIdCounter;
-            requests[requestId] = { url: cleanedUrl, format };
-            addItemToList(requestId, video.title, format);
-          });
-        } catch (err) {
-          alert(`プレイリスト取得エラー: ${err.message}`);
-        }
-      } else {
-        const cleanedUrl = cleanYouTubeUrl(url);
-        const requestId = ++requestIdCounter;
-        requests[requestId] = { url: cleanedUrl, format };
-
-        const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-        const title = videoIdMatch ? `Video ${videoIdMatch[1]}` : cleanedUrl;
-        addItemToList(requestId, title, format);
       }
 
       document.getElementById('url-input').value = '';
@@ -514,14 +560,36 @@
       }
     }
 
+    function showConfirm(message) {
+      return new Promise((resolve) => {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-info';
+        toast.style.flexDirection = 'column';
+        toast.style.gap = '12px';
+        toast.style.alignItems = 'stretch';
+        toast.innerHTML = `<div>${message}</div><div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-sm btn-danger confirm-cancel">キャンセル</button><button class="btn btn-sm btn-success confirm-ok">OK</button></div>`;
+        container.appendChild(toast);
+        toast.querySelector('.confirm-ok').addEventListener('click', () => {
+          toast.remove();
+          resolve(true);
+        });
+        toast.querySelector('.confirm-cancel').addEventListener('click', () => {
+          toast.remove();
+          resolve(false);
+        });
+      });
+    }
+
     function clearAll() {
       if (Object.keys(requests).length === 0) return;
-      if (!confirm('すべてのアイテムを削除しますか？')) return;
-
-      const list = document.getElementById('request-list');
-      list.innerHTML = '<li class="empty-list">まだリストにアイテムがありません</li>';
-      for (const key in requests) delete requests[key];
-      updateCount();
+      showConfirm('すべてのアイテムを削除しますか？').then((ok) => {
+        if (!ok) return;
+        const list = document.getElementById('request-list');
+        list.innerHTML = '<li class="empty-list">まだリストにアイテムがありません</li>';
+        for (const key in requests) delete requests[key];
+        updateCount();
+      });
     }
 
     function checkEmpty() {
@@ -552,7 +620,7 @@
       });
 
       if (pendingRequests.length === 0) {
-        alert('ダウンロード可能なアイテムがありません');
+        showToast('ダウンロード可能なアイテムがありません', 'info');
         return;
       }
 
@@ -582,7 +650,7 @@
           setupWebSocket(selectedUrl);
           setTimeout(() => startDownload(requestId), 3000);
         } else {
-          alert('サーバーが選択されていません');
+          showToast('サーバーが選択されていません', 'error');
         }
         return;
       }
