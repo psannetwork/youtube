@@ -102,6 +102,9 @@ function setupWebSocket(url, onRequestDataCallback) {
     reconnectTimer = null;
   }
 
+  // 接続変更時に前の接続の処理中のダウンロード状態をリセット
+  resetAllPendingStatus();
+
   updateConnectionStatus('connecting', '接続中...');
 
   ws = new WebSocket(url);

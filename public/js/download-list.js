@@ -103,3 +103,42 @@ function addRequest(url, format, title) {
 function getRequest(requestId) {
   return requests[requestId];
 }
+
+function resetAllPendingStatus() {
+  Object.keys(requests).forEach(id => {
+    const statusBadge = document.querySelector(`#status-${id}`);
+    const downloadBtn = document.querySelector(`#download-btn-${id}`);
+    const stopBtn = document.querySelector(`#stop-btn-${id}`);
+    const progressBar = document.querySelector(`#progress-${id}`);
+    const progressContainer = document.querySelector(`#progress-bar-${id}`);
+
+    if (statusBadge) {
+      statusBadge.textContent = '待機中';
+      statusBadge.className = 'status-badge status-waiting';
+    }
+
+    if (downloadBtn) {
+      downloadBtn.disabled = false;
+      downloadBtn.textContent = 'ダウンロード';
+    }
+
+    if (stopBtn) {
+      stopBtn.disabled = false;
+      stopBtn.textContent = '停止';
+      stopBtn.style.display = 'none';
+    }
+
+    if (progressBar) {
+      progressBar.style.width = '0%';
+    }
+
+    if (progressContainer) {
+      progressContainer.classList.remove('complete', 'error');
+    }
+
+    const linkContainer = document.querySelector(`#link-${id}`);
+    if (linkContainer) {
+      linkContainer.innerHTML = '';
+    }
+  });
+}
