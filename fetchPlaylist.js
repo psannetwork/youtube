@@ -1,18 +1,53 @@
 // fetchPlaylist.js
-const ytpl = require('@distube/ytpl');
+const { spawn } = require('child_process');
 
-// プレイリストを取得する関数
+// プレイリストを取得する関数（yt-dlp直接使用）
 const fetchPlaylist = async (playlistId) => {
-    try {
-        const playlist = await ytpl(playlistId);
-        return playlist.items.map(item => ({
-            title: item.title,
-            url: item.url,
-        }));
-    } catch (error) {
-        console.error('Error fetching playlist:', error);
-        throw new Error('プレイリストの取得に失敗しました');
-    }
+    return new Promise((resolve, reject) => {
+        const args = [
+            '--flat-playlist',
+            '--print', '%(id)s|%(title)s|%(url)s',
+            `https://www.youtube.com/playlist?list=${playlistId}`
+        ];
+
+        const child = spawn('yt-dlp', args);
+        let output = '';
+        let errorOutput = '';
+
+        child.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+
+        child.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+        });
+
+        child.on('close', (code) => {
+            if (code === 0) {
+                const videos = output
+                    .trim()
+                    .split('\n')
+                    .filter(line => line.includes('|'))
+                    .map(line => {
+                        const [id, title, url] = line.split('|');
+                        return {
+                            id,
+                            title: title || `Video ${id}`,
+                            url: url || `https://www.youtube.com/watch?v=${id}`
+                        };
+                    });
+
+                if (videos.length === 0) {
+                    reject(new Error('プレイリストが空です'));
+                } else {
+                    resolve(videos);
+                }
+            } else {
+                console.error('yt-dlp error:', errorOutput);
+                reject(new Error('プレイリストの取得に失敗しました'));
+            }
+        });
+    });
 };
 
 module.exports = fetchPlaylist;

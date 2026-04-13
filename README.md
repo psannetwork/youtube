@@ -13,10 +13,31 @@ cd youtube
 ```
 npm i
 ```
-## youtube-dl-exec パッケージをインストール
+
+## yt-dlp をインストール
+
+`yt-dlp` は手動でインストールしてください。
+
+### インストール方法
+
+**方法1: 直接ダウンロード（推奨）**
+```bash
+sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+sudo chmod +x /usr/local/bin/yt-dlp
 ```
-npm install youtube-dl-exec --save
+
+**方法2: pip でインストール**
+```bash
+pip install yt-dlp
 ```
+
+**方法3: apt でインストール（Ubuntu/Debian）**
+```bash
+sudo apt install yt-dlp
+```
+
+> ※ apt でロックエラーが発生する場合は、別のパッケージマネージャ処理が実行中です。完了してから再試行するか、方法1を使用してください。
+
 ## アプリケーションを起動
 ```
 npm start

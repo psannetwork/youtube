@@ -29,3 +29,7 @@ yarn-error.log*
 cookies.txt
 cookie.txt
 /tmp
+
+# yt-dlp
+/usr/local/bin/yt-dlp
+/usr/bin/yt-dlp
