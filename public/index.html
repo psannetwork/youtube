@@ -34,34 +34,24 @@
     </div>
 
     <!-- 形式選択 -->
-    <div class="form-row">
-      <div class="form-group">
-        <label for="format-select">📦 形式</label>
-        <select id="format-select">
-          <optgroup label="動画">
-            <option value="mp4">MP4 (1080p)</option>
-            <option value="mp4_720">MP4 (720p)</option>
-            <option value="mp4_480">MP4 (480p)</option>
-            <option value="mkv">MKV</option>
-          </optgroup>
-          <optgroup label="音声">
-            <option value="mp3">MP3 (320kbps)</option>
-            <option value="mp3_128">MP3 (128kbps)</option>
-            <option value="wav">WAV</option>
-            <option value="flac">FLAC (ロスレス)</option>
-            <option value="aac">AAC</option>
-            <option value="opus">Opus</option>
-          </optgroup>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="quality-select">⚙️ 品質</label>
-        <select id="quality-select">
-          <option value="best">最高</option>
-          <option value="good">高</option>
-          <option value="normal">標準</option>
-        </select>
-      </div>
+    <div class="form-group">
+      <label for="format-select">📦 デフォルト形式</label>
+      <select id="format-select">
+        <optgroup label="動画">
+          <option value="mp4">MP4 (1080p)</option>
+          <option value="mp4_720">MP4 (720p)</option>
+          <option value="mp4_480">MP4 (480p)</option>
+          <option value="mkv">MKV</option>
+        </optgroup>
+        <optgroup label="音声">
+          <option value="mp3">MP3 (320kbps)</option>
+          <option value="mp3_128">MP3 (128kbps)</option>
+          <option value="wav">WAV</option>
+          <option value="flac">FLAC (ロスレス)</option>
+          <option value="aac">AAC</option>
+          <option value="opus">Opus</option>
+        </optgroup>
+      </select>
     </div>
 
     <!-- ボタン -->
@@ -71,6 +61,7 @@
     <div class="button-row">
       <button id="download-all-button" class="btn btn-success">⬇️ 一括ダウンロード</button>
       <button id="clear-completed-button" class="btn btn-danger">🗑️ 完了を削除</button>
+      <button id="clear-all-button" class="btn btn-danger">🗑️ すべて削除</button>
     </div>
 
     <!-- ダウンロードリスト -->
@@ -394,7 +385,6 @@
     document.getElementById('add-button').addEventListener('click', async () => {
       const url = document.getElementById('url-input').value.trim();
       const format = document.getElementById('format-select').value;
-      const quality = document.getElementById('quality-select').value;
 
       if (!url || !/^https?:\/\/(www\.)?youtube\.com\/|youtu\.be\//.test(url)) {
         alert('正しいYouTube URLを入力してください');
@@ -409,7 +399,7 @@
         if (playlistId.startsWith('RD')) {
           const cleanedUrl = cleanYouTubeUrl(url);
           const requestId = ++requestIdCounter;
-          requests[requestId] = { url: cleanedUrl, format, quality };
+          requests[requestId] = { url: cleanedUrl, format };
           addItemToList(requestId, 'ラジオミックス', format);
           return;
         }
@@ -426,7 +416,7 @@
           videos.forEach((video) => {
             const cleanedUrl = cleanYouTubeUrl(video.url);
             const requestId = ++requestIdCounter;
-            requests[requestId] = { url: cleanedUrl, format, quality };
+            requests[requestId] = { url: cleanedUrl, format };
             addItemToList(requestId, video.title, format);
           });
         } catch (err) {
@@ -435,7 +425,7 @@
       } else {
         const cleanedUrl = cleanYouTubeUrl(url);
         const requestId = ++requestIdCounter;
-        requests[requestId] = { url: cleanedUrl, format, quality };
+        requests[requestId] = { url: cleanedUrl, format };
 
         // タイトル取得を試みる（簡易表示）
         const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
@@ -450,6 +440,25 @@
       const emptyMsg = document.querySelector('.empty-list');
       if (emptyMsg) emptyMsg.remove();
 
+      const formatOptions = [
+        { value: 'mp4', label: 'MP4 (1080p)' },
+        { value: 'mp4_720', label: 'MP4 (720p)' },
+        { value: 'mp4_480', label: 'MP4 (480p)' },
+        { value: 'mkv', label: 'MKV' },
+        { value: 'mp3', label: 'MP3 (320k)' },
+        { value: 'mp3_128', label: 'MP3 (128k)' },
+        { value: 'wav', label: 'WAV' },
+        { value: 'flac', label: 'FLAC' },
+        { value: 'aac', label: 'AAC' },
+        { value: 'opus', label: 'Opus' }
+      ];
+
+      const formatSelectHtml = `
+        <select class="item-format-select" id="format-select-${requestId}" onchange="changeItemFormat(${requestId})">
+          ${formatOptions.map(opt => `<option value="${opt.value}" ${opt.value === format ? 'selected' : ''}>${opt.label}</option>`).join('')}
+        </select>
+      `;
+
       const listItem = document.createElement('li');
       listItem.id = `request-${requestId}`;
       listItem.dataset.title = title.toLowerCase();
@@ -457,7 +466,7 @@
         <div class="item-header">
           <div>
             <span class="item-title">${escapeHtml(title)}</span>
-            <span class="item-format">${format}</span>
+            ${formatSelectHtml}
             <span class="status-badge status-waiting" id="status-${requestId}">待機中</span>
           </div>
           <div class="item-actions">
@@ -488,6 +497,25 @@
         updateCount();
         checkEmpty();
       }
+    }
+
+    // アイテムの形式を変更
+    function changeItemFormat(requestId) {
+      const select = document.getElementById(`format-select-${requestId}`);
+      if (select && requests[requestId]) {
+        requests[requestId].format = select.value;
+      }
+    }
+
+    // すべて削除
+    function clearAll() {
+      if (Object.keys(requests).length === 0) return;
+      if (!confirm('すべてのアイテムを削除しますか？')) return;
+
+      const list = document.getElementById('request-list');
+      list.innerHTML = '<li class="empty-list">まだリストにアイテムがありません</li>';
+      for (const key in requests) delete requests[key];
+      updateCount();
     }
 
     function checkEmpty() {
@@ -541,6 +569,9 @@
       checkEmpty();
       updateCount();
     });
+
+    // すべて削除
+    document.getElementById('clear-all-button').addEventListener('click', clearAll);
 
     function startDownload(requestId) {
       if (!ws || ws.readyState !== WebSocket.OPEN) {

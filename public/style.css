@@ -320,6 +320,26 @@ li .item-format {
   white-space: nowrap;
 }
 
+/* アイテム形式セレクタ */
+.item-format-select {
+  display: inline-block;
+  padding: 3px 8px;
+  margin-right: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  background-color: #fff;
+  color: var(--text);
+  cursor: pointer;
+  width: auto;
+}
+
+.item-format-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+
 li .item-actions {
   display: flex;
   gap: 8px;
