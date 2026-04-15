@@ -31,7 +31,21 @@ sudo chmod +x /usr/local/bin/yt-dlp
 pip install yt-dlp
 ```
 
-**方法3: apt でインストール（Ubuntu/Debian）**
+**方法3: pipx でインストール（Ubuntu/Debian向け）**
+```bash
+sudo apt install -y pipx
+pipx install yt-dlp
+pipx ensurepath
+source ~/.bashrc
+```
+更新
+```
+pipx upgrade yt-dlp
+```
+
+**方法4: apt でインストール（Ubuntu/Debian）**
+
+**※yt-dlpが最新バージョンじゃないので使えない可能性大**
 ```bash
 sudo apt install yt-dlp
 ```
