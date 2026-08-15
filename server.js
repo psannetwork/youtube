@@ -13,39 +13,38 @@ const urlList = require('./public/url_list.json');
 
 const app = express();
 const port = 3020;
-const wss = new WebSocket.Server({ noServer: true, maxPayload: 10 * 1024 }); 
+const wss = new WebSocket.Server({ noServer: true, maxPayload: 10 * 1024 });
 
-
+// Worker設定（環境変数で調整可能、デフォルトは2）
 const MAX_CONCURRENT_DOWNLOADS = parseInt(process.env.MAX_WORKERS) || 2;
-const RESERVED_SPACE_GB = parseFloat(process.env.RESERVED_SPACE_GB) || 5; 
+const RESERVED_SPACE_GB = parseFloat(process.env.RESERVED_SPACE_GB) || 5;
 
+// セキュリティ設定
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 100; // 緩和
+const WS_RATE_LIMIT_WINDOW_MS = 10 * 1000;
+const WS_RATE_LIMIT_MAX_MESSAGES = 20;
+const requestCounts = new Map();
+const wsMessageCounts = new Map();
 
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; 
-const RATE_LIMIT_MAX_REQUESTS = 100; // 静的ファイルも含めるため緩和
-const WS_RATE_LIMIT_WINDOW_MS = 10 * 1000; 
-const WS_RATE_LIMIT_MAX_MESSAGES = 20; 
-const requestCounts = new Map(); 
-const wsMessageCounts = new Map(); 
+// DDoS対策: キューサイズの上限
+const MAX_QUEUE_SIZE = 50;
 
-
-const MAX_QUEUE_SIZE = 50; 
-
-
+// YouTube URLバリデーション用正規表現
 const YOUTUBE_URL_REGEX = /^https?:\/\/(www\.|m\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]{11}|^https?:\/\/youtu\.be\/[a-zA-Z0-9_-]{11}/;
 const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
 
-
-
+// URLリストからWebSocketサーバーのドメインを抽出
 const allowedWsDomains = urlList.map((item) => {
   try {
-    const url = item.url.replace(/^wss:\/\//, 'https://');
+    const url = item.url.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://');
     return new URL(url).origin;
   } catch {
     return null;
   }
 }).filter(Boolean);
 
-
+// セキュリティヘッダー（緩和版）
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -63,9 +62,9 @@ app.use(helmet({
       frameAncestors: ["'none'"],
     }
   },
-  crossOriginEmbedderPolicy: true,
-  crossOriginOpenerPolicy: true,
-  crossOriginResourcePolicy: { policy: "same-origin" },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
   dnsPrefetchControl: { allow: false },
   frameguard: { action: "deny" },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
@@ -75,17 +74,16 @@ app.use(helmet({
   xssFilter: true
 }));
 
-
 // CORS設定（開発環境向けに緩和）
 app.use(cors({
-  origin: true, // すべてのオリジンを許可
+  origin: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   maxAge: 86400
 }));
 
-
+// レート制限ミドルウェア
 function rateLimiter(req, res, next) {
   // 静的ファイルはレート制限から除外
   if (req.path.startsWith('/js/') || 
@@ -129,7 +127,7 @@ app.use('/api/', rateLimiter);
 app.use('/fetch-', rateLimiter);
 app.use('/download/', rateLimiter);
 
-
+// リクエストボディのサイズ制限
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 
@@ -139,12 +137,16 @@ if (!fs.existsSync(tmpDir)) {
 }
 
 const MAX_TMP_SIZE = parseInt(process.env.MAX_TMP_SIZE_GB) * 1024 * 1024 * 1024 || 5 * 1024 * 1024 * 1024;
+const TMP_EXPIRY_MS = 10 * 60 * 1000; // 10分で有効期限切れ
+
+// サーバー起動時に期限切れファイルを削除
+cleanupExpiredFiles();
 
 const activeDownloads = new Map();
-const downloadQueue = []; 
+const downloadQueue = [];
 let isProcessingQueue = false;
 
-
+// ディスク容量チェック関数
 function checkDiskSpace() {
   try {
     const stats = fs.statfsSync(tmpDir);
@@ -157,21 +159,19 @@ function checkDiskSpace() {
     };
   } catch (e) {
     console.error('ディスク容量チェックに失敗:', e.message);
-    return { available: 0, reserved: 0, hasSpace: true }; 
+    return { available: 0, reserved: 0, hasSpace: true };
   }
 }
 
-
+// キュー処理関数
 function processQueue() {
   if (isProcessingQueue) return;
   isProcessingQueue = true;
 
   while (activeDownloads.size < MAX_CONCURRENT_DOWNLOADS && downloadQueue.length > 0) {
-    
     const spaceCheck = checkDiskSpace();
     if (!spaceCheck.hasSpace) {
       console.warn(`ディスク容量不足: 利用可能 ${(spaceCheck.available / 1024 / 1024 / 1024).toFixed(2)}GB, 予約 ${RESERVED_SPACE_GB}GB`);
-      
       downloadQueue.forEach(item => {
         try {
           item.ws.send(JSON.stringify({ 
@@ -187,7 +187,6 @@ function processQueue() {
     const nextDownload = downloadQueue.shift();
     const { requestId, url, format, ws } = nextDownload;
     
-    
     if (ws.readyState !== WebSocket.OPEN) {
       continue;
     }
@@ -198,7 +197,7 @@ function processQueue() {
   isProcessingQueue = false;
 }
 
-
+// WebSocketメッセージレート制限チェック
 function checkWsRateLimit(ws) {
   const now = Date.now();
   
@@ -208,7 +207,6 @@ function checkWsRateLimit(ws) {
   }
   
   const record = wsMessageCounts.get(ws);
-  
   
   if (now - record.startTime > WS_RATE_LIMIT_WINDOW_MS) {
     record.count = 1;
@@ -225,9 +223,8 @@ function checkWsRateLimit(ws) {
   return true;
 }
 
-
+// キューに追加（DDoS対策: キューサイズ制限あり）
 function queueDownload(requestId, url, format, ws) {
-  
   if (downloadQueue.length >= MAX_QUEUE_SIZE) {
     try {
       ws.send(JSON.stringify({ 
@@ -243,24 +240,58 @@ function queueDownload(requestId, url, format, ws) {
   processQueue();
 }
 
+// 期限切れファイル削除関数（タイムスタンプベース）
+function cleanupExpiredFiles() {
+  try {
+    const files = fs.readdirSync(tmpDir);
+    const now = Date.now();
+    let deletedCount = 0;
+
+    files.forEach(file => {
+      const filePath = path.join(tmpDir, file);
+      try {
+        const stat = fs.statSync(filePath);
+        const age = now - stat.mtimeMs;
+        
+        // 10分以上経過している場合は削除
+        if (age > TMP_EXPIRY_MS) {
+          fs.rmSync(filePath, { recursive: true, force: true });
+          deletedCount++;
+          console.log(`期限切れファイルを削除: ${file} (${Math.floor(age / 60000)}分経過)`);
+        }
+      } catch (e) {
+        console.error(`ファイル削除エラー (${file}):`, e.message);
+      }
+    });
+
+    if (deletedCount > 0) {
+      console.log(`合計 ${deletedCount} 件の期限切れファイルを削除しました`);
+    }
+  } catch (e) {
+    console.error('期限切れファイル削除エラー:', e.message);
+  }
+}
+
+// 定期クリーンアップ（1分ごとに期限切れチェック、5分ごとに容量チェック）
+setInterval(() => {
+  cleanupExpiredFiles();
+}, 60 * 1000); // 1分ごと
 
 setInterval(() => {
   cleanupTmp();
   processQueue();
-}, 30 * 60 * 1000);
+}, 5 * 60 * 1000); // 5分ごと
 
-
-
+// キュー待機中のアイテムがある場合の定期的な再チェック（30秒ごと）
 setInterval(() => {
   if (downloadQueue.length > 0) {
     processQueue();
   }
-}, 30000); 
+}, 30000);
 
 function cleanupTmp() {
-  fs.readdir(tmpDir, (err, files) => {
-    if (err) return;
-
+  try {
+    const files = fs.readdirSync(tmpDir);
     let totalSize = 0;
     const fileStats = [];
 
@@ -276,10 +307,10 @@ function cleanupTmp() {
           totalSize += stat.size;
           fileStats.push({ path: filePath, size: stat.size, mtime: stat.mtimeMs });
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     });
 
+    // 容量超過時の削除
     if (totalSize > MAX_TMP_SIZE) {
       fileStats.sort((a, b) => a.mtime - b.mtime);
       for (const fileStat of fileStats) {
@@ -287,24 +318,13 @@ function cleanupTmp() {
         try {
           fs.rmSync(fileStat.path, { recursive: true, force: true });
           totalSize -= fileStat.size;
-        } catch (e) {
-        }
+          console.log(`容量超過のため削除: ${path.basename(fileStat.path)}`);
+        } catch (e) {}
       }
     }
-
-    const now = Date.now();
-    const oneDay = 24 * 60 * 60 * 1000;
-    files.forEach(file => {
-      const filePath = path.join(tmpDir, file);
-      try {
-        const stat = fs.statSync(filePath);
-        if (now - stat.mtimeMs > oneDay) {
-          fs.rmSync(filePath, { recursive: true, force: true });
-        }
-      } catch (e) {
-      }
-    });
-  });
+  } catch (e) {
+    console.error('cleanupTmpエラー:', e.message);
+  }
 }
 
 function getDirSize(dirPath) {
@@ -316,8 +336,7 @@ function getDirSize(dirPath) {
       const stat = fs.statSync(filePath);
       size += stat.isDirectory() ? getDirSize(filePath) : stat.size;
     });
-  } catch (e) {
-  }
+  } catch (e) {}
   return size;
 }
 
@@ -344,7 +363,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('message', async (message) => {
-    
+    // WebSocketメッセージレート制限チェック
     if (!checkWsRateLimit(ws)) {
       try {
         ws.send(JSON.stringify({ type: 'error', message: 'メッセージが多すぎます。しばらくお待ちください。' }));
@@ -387,14 +406,12 @@ wss.on('connection', (ws) => {
           if (download.child && download.child.pid) {
             try {
               process.kill(-download.child.pid, 'SIGTERM');
-            } catch (e) {
-            }
+            } catch (e) {}
           }
           download.stopped = true;
           try {
             fs.rmSync(download.randomDir, { recursive: true, force: true });
-          } catch (e) {
-          }
+          } catch (e) {}
           activeDownloads.delete(requestId);
           ws.send(JSON.stringify({ type: 'stopped', requestId }));
         }
@@ -415,7 +432,6 @@ wss.on('connection', (ws) => {
         return ws.send(JSON.stringify({ type: 'error', requestId, message: '無効な形式です' }));
       }
 
-      
       queueDownload(requestId, url, format, ws);
 
     } catch (err) {
@@ -424,27 +440,22 @@ wss.on('connection', (ws) => {
   });
 });
 
-
+// URLサニタイズ関数（コマンドインジェクション対策）
 function sanitizeUrl(url) {
   if (typeof url !== 'string') return null;
-  
-  
   if (url.length > 2048) return null;
-  
-  
   if (/[;&|`$(){}[\]<>!#%]/.test(url)) {
     return null;
   }
   
-  
   const dangerousPatterns = [
-    /\.\./,           
+    /\.\./,
     /\/etc\//,
     /\/proc\//,
-    /c:\\/i,          
-    /%[0-9a-f]{2}/i,  
-    /\$\{/,           
-    /`.*`/,           
+    /c:\\/i,
+    /%[0-9a-f]{2}/i,
+    /\$\{/,
+    /`.*`/,
   ];
   
   for (const pattern of dangerousPatterns) {
@@ -456,7 +467,7 @@ function sanitizeUrl(url) {
   return url;
 }
 
-
+// YouTube URL検証関数
 function validateYouTubeUrl(url) {
   const sanitized = sanitizeUrl(url);
   if (!sanitized) return null;
@@ -469,7 +480,6 @@ function validateYouTubeUrl(url) {
       return null;
     }
     
-    
     if (!['http:', 'https:'].includes(urlObj.protocol)) {
       return null;
     }
@@ -479,14 +489,13 @@ function validateYouTubeUrl(url) {
       return null;
     }
     
-    
-    return `https://${urlObj.hostname}${urlObj.pathname}${urlObj.search}`;
+    return `https://www.youtube.com/watch?v=${videoId}`;
   } catch {
     return null;
   }
 }
 
-
+// 動画情報取得エンドポイント
 app.get('/api/video-info', async (req, res) => {
   try {
     const { url } = req.query;
@@ -494,13 +503,11 @@ app.get('/api/video-info', async (req, res) => {
       return res.status(400).json({ error: 'URLが必要です' });
     }
 
-    
     const safeUrl = validateYouTubeUrl(url);
     if (!safeUrl) {
       return res.status(400).json({ error: '無効なYouTube URLです' });
     }
 
-    
     const info = await getVideoInfo(safeUrl);
     res.json(info);
   } catch (err) {
@@ -550,7 +557,7 @@ function getVideoInfo(url) {
           resolve({
             id: info.id,
             title: info.title,
-            thumbnail: info.thumbnail || 'https://i.ytimg.com/vi/' + info.id + '/hqdefault.jpg',
+            thumbnail: info.thumbnail || `https://i.ytimg.com/vi/${info.id}/hqdefault.jpg`,
             duration: info.duration,
             uploader: info.uploader || info.channel,
             description: info.description ? info.description.substring(0, 200) + '...' : '',
@@ -572,7 +579,6 @@ function getVideoInfo(url) {
 }
 
 function startDownload(requestId, url, format, ws) {
-  
   const safeUrl = validateYouTubeUrl(url);
   if (!safeUrl) {
     return ws.send(JSON.stringify({ type: 'error', requestId, message: '無効なYouTube URLです' }));
@@ -595,7 +601,7 @@ function startDownload(requestId, url, format, ws) {
     args.push('--no-check-certificates');
   }
 
-  args.push(safeUrl); 
+  args.push(safeUrl);
 
   if (fs.existsSync('cookie.txt')) {
     try {
@@ -632,20 +638,16 @@ function startDownload(requestId, url, format, ws) {
 
     if (code === 0) {
       const files = fs.readdirSync(randomDir).map((file) => {
-        
-        
         let safeFileName = file
-          .replace(/[\/\\:*?"<>|\x00-\x1f\x7f]/g, '_')  
-          .replace(/\.\./g, '_')                          
-          .replace(/^\.+/, '_')                           
-          .replace(/_{2,}/g, '_')                         
+          .replace(/[\/\\:*?"<>|\x00-\x1f\x7f]/g, '_')
+          .replace(/\.\./g, '_')
+          .replace(/^\.+/, '_')
+          .replace(/_{2,}/g, '_')
           .trim();
-        
         
         if (!safeFileName || safeFileName.length === 0) {
           safeFileName = `download_${Date.now()}`;
         }
-        
         
         if (safeFileName.length > 255) {
           const ext = path.extname(safeFileName);
@@ -663,14 +665,12 @@ function startDownload(requestId, url, format, ws) {
       setTimeout(() => {
         fs.rmSync(randomDir, { recursive: true, force: true });
         activeDownloads.delete(requestId);
-        
         processQueue();
       }, 300000);
     } else {
       ws.send(JSON.stringify({ type: 'error', requestId, message: 'yt-dlpがエラーを返しました' }));
       fs.rmSync(randomDir, { recursive: true, force: true });
       activeDownloads.delete(requestId);
-      
       processQueue();
     }
   });
@@ -746,15 +746,13 @@ function generateRandomString(length) {
   return require('crypto').randomBytes(Math.ceil(length * 3 / 4)).toString('base64url').slice(0, length);
 }
 
-
+// ダウンロードエンドポイントのセキュリティ強化
 app.get('/download/:dir/:file', (req, res) => {
   const { dir, file } = req.params;
-  
   
   if (!/^[a-zA-Z0-9_-]+$/.test(dir)) {
     return res.status(400).send('Invalid directory name');
   }
-  
   
   const safeDir = path.basename(dir).replace(/[^a-zA-Z0-9_-]/g, '_');
   const safeFile = path.basename(file).replace(/[\/\\:*?"<>|\x00-\x1f\x7f]/g, '_');
@@ -763,13 +761,11 @@ app.get('/download/:dir/:file', (req, res) => {
   const filePath = path.join(resolvedTmpDir, safeDir, safeFile);
   const normalizedPath = path.normalize(filePath);
 
-  
   if (!normalizedPath.startsWith(resolvedTmpDir + path.sep) && normalizedPath !== resolvedTmpDir) {
     console.warn(`Path traversal attempt detected: ${req.originalUrl}`);
     return res.status(403).send('Access denied');
   }
 
-  
   try {
     const stats = fs.lstatSync(normalizedPath);
     if (stats.isSymbolicLink()) {
@@ -781,7 +777,6 @@ app.get('/download/:dir/:file', (req, res) => {
   }
 
   if (fs.existsSync(normalizedPath)) {
-    
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(normalizedPath))}`);
@@ -823,7 +818,7 @@ app.get('/fetch-channel-playlists', async (req, res) => {
       return res.status(400).json({ error: 'URLが必要です' });
     }
 
-    if (!/^https?:\/\/(www\.)?youtube\.com\/.+/.test(url)) {
+    if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+$/.test(url)) {
       return res.status(400).json({ error: 'YouTubeのURLのみ許可されています' });
     }
 
@@ -839,9 +834,8 @@ const server = app.listen(port, () => {
   console.log(`Secure Server is running on http://localhost:${port}`);
 });
 
+// WebSocket upgradeハンドラ（originチェック無効化）
 server.on('upgrade', (req, socket, head) => {
-  // 開発環境向けにoriginチェックを無効化
-  // 本番環境では有効化することを推奨
   wss.handleUpgrade(req, socket, head, (ws) => {
     wss.emit('connection', ws, req);
   });
