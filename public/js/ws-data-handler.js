@@ -1,11 +1,19 @@
-/**
- * WebSocketデータ処理
- */
 
 function handleWebSocketData(data) {
   const { requestId, type, percentage, files, message } = data;
 
-  if (type === 'progress') {
+  if (type === 'waiting') {
+    
+    const statusBadge = document.querySelector(`#status-${requestId}`);
+    if (statusBadge) {
+      statusBadge.textContent = '待機中';
+      statusBadge.className = 'status-badge status-waiting';
+    }
+    
+    if (message && !document.querySelector(`#waiting-toast-${requestId}`)) {
+      showToast(message, 'info');
+    }
+  } else if (type === 'progress') {
     const progressBar = document.querySelector(`#progress-${requestId}`);
     const statusBadge = document.querySelector(`#status-${requestId}`);
     if (progressBar) {

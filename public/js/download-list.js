@@ -1,11 +1,8 @@
-/**
- * ダウンロードリスト管理
- */
 
 const requests = {};
 let requestIdCounter = 0;
 
-function addItemToList(requestId, title, format) {
+function addItemToList(requestId, title, format, videoInfo = null) {
   const emptyMsg = document.querySelector('.empty-list');
   if (emptyMsg) emptyMsg.remove();
 
@@ -28,29 +25,74 @@ function addItemToList(requestId, title, format) {
     </select>
   `;
 
+  
+  let thumbnailHtml = '';
+  let infoHtml = '';
+  
+  if (videoInfo) {
+    const thumbnailUrl = videoInfo.thumbnail || `https://i.ytimg.com/vi/${videoInfo.id}/mqdefault.jpg`;
+    thumbnailHtml = `
+      <div class="item-thumbnail">
+        <img src="${escapeHtml(thumbnailUrl)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 320 180%22><rect fill=%22%23ddd%22 width=%22320%22 height=%22180%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>No Thumbnail</text></svg>'">
+      </div>
+    `;
+    
+    const durationStr = videoInfo.duration ? formatDuration(videoInfo.duration) : '';
+    const uploaderStr = videoInfo.uploader ? escapeHtml(videoInfo.uploader) : '';
+    const descriptionStr = videoInfo.description ? escapeHtml(videoInfo.description.substring(0, 100)) + '...' : '';
+    
+    infoHtml = `
+      <div class="item-info">
+        ${uploaderStr ? `<span class="item-uploader">${uploaderStr}</span>` : ''}
+        ${durationStr ? `<span class="item-duration">${durationStr}</span>` : ''}
+        ${descriptionStr ? `<p class="item-description">${descriptionStr}</p>` : ''}
+      </div>
+    `;
+  }
+
   const listItem = document.createElement('li');
   listItem.id = `request-${requestId}`;
   listItem.dataset.title = title.toLowerCase();
   listItem.innerHTML = `
-    <div class="item-header">
-      <div>
-        <span class="item-title">${escapeHtml(title)}</span>
-        ${formatSelectHtml}
-        <span class="status-badge status-waiting" id="status-${requestId}">待機中</span>
-      </div>
-      <div class="item-actions">
-        <button id="download-btn-${requestId}" class="btn btn-sm btn-primary" onclick="startDownload(${requestId})">ダウンロード</button>
-        <button id="stop-btn-${requestId}" class="btn btn-sm btn-danger" onclick="stopDownload(${requestId})" style="display:none;">停止</button>
-        <button class="btn btn-sm btn-danger" onclick="removeItem(${requestId})">削除</button>
+    <div class="item-content">
+      ${thumbnailHtml}
+      <div class="item-details">
+        <div class="item-header">
+          <div>
+            <span class="item-title">${escapeHtml(title)}</span>
+            ${infoHtml}
+            <div class="item-controls">
+              ${formatSelectHtml}
+              <span class="status-badge status-waiting" id="status-${requestId}">待機中</span>
+            </div>
+          </div>
+          <div class="item-actions">
+            <button id="download-btn-${requestId}" class="btn btn-sm btn-primary" onclick="startDownload(${requestId})">ダウンロード</button>
+            <button id="stop-btn-${requestId}" class="btn btn-sm btn-danger" onclick="stopDownload(${requestId})" style="display:none;">停止</button>
+            <button class="btn btn-sm btn-danger" onclick="removeItem(${requestId})">削除</button>
+          </div>
+        </div>
+        <div class="progress-bar" id="progress-bar-${requestId}" style="display:block;">
+          <div class="progress" id="progress-${requestId}"></div>
+        </div>
+        <div id="link-${requestId}" class="link-container"></div>
       </div>
     </div>
-    <div class="progress-bar" id="progress-bar-${requestId}" style="display:block;">
-      <div class="progress" id="progress-${requestId}"></div>
-    </div>
-    <div id="link-${requestId}" class="link-container"></div>
   `;
   document.getElementById('request-list').appendChild(listItem);
   updateCount();
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return '';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
 function removeItem(requestId) {
@@ -92,11 +134,11 @@ function clearAll() {
   });
 }
 
-function addRequest(url, format, title) {
+function addRequest(url, format, title, videoInfo = null) {
   const cleanedUrl = cleanYouTubeUrl(url);
   const requestId = ++requestIdCounter;
-  requests[requestId] = { url: cleanedUrl, format };
-  addItemToList(requestId, title, format);
+  requests[requestId] = { url: cleanedUrl, format, videoInfo };
+  addItemToList(requestId, title, format, videoInfo);
   return requestId;
 }
 

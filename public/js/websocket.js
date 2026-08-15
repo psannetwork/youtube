@@ -1,8 +1,5 @@
-/**
- * WebSocket接続・通信管理
- */
 
-const CLIENT_VERSION = '2.0.1';
+const CLIENT_VERSION = '2.0.2';
 let ws;
 let pingInterval = null;
 let reconnectTimer = null;
@@ -102,7 +99,7 @@ function setupWebSocket(url, onRequestDataCallback) {
     reconnectTimer = null;
   }
 
-  // 接続変更時に前の接続の処理中のダウンロード状態をリセット
+  
   resetAllPendingStatus();
 
   updateConnectionStatus('connecting', '接続中...');
@@ -139,8 +136,18 @@ function setupWebSocket(url, onRequestDataCallback) {
     }
   };
 
-  ws.onclose = () => {
+  ws.onclose = (event) => {
     stopPing();
+    
+    // バージョン不一致や意図的な切断の場合は再接続しない
+    const statusText = document.querySelector('#connection-status .status-text');
+    const currentStatus = statusText ? statusText.textContent : '';
+    
+    if (currentStatus.includes('バージョン不一致') || event.code === 1000) {
+      updateConnectionStatus('disconnected', '接続終了');
+      return;
+    }
+    
     updateConnectionStatus('reconnecting', '再接続中...');
     reconnectTimer = setTimeout(() => {
       if (!ws || ws.readyState === WebSocket.CLOSED) {

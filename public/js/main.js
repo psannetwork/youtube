@@ -1,9 +1,4 @@
-/**
- * メイン初期化処理
- */
-
 document.addEventListener('DOMContentLoaded', () => {
-  // URLリストの読み込み
   fetch('url_list.json')
     .then(response => response.json())
     .then(urlList => {
@@ -28,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
       updateConnectionStatus('disconnected', '設定エラー');
     });
 
-  // イベントリスナーの設定
   document.getElementById('add-button').addEventListener('click', handleAddButton);
   document.getElementById('download-all-button').addEventListener('click', handleDownloadAll);
   document.getElementById('clear-completed-button').addEventListener('click', handleClearCompleted);

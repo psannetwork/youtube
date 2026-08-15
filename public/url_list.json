@@ -1,7 +1,7 @@
 [
   {
     "name": "Psannetwork",
-    "url": "wss://youtubedownload.psannetwork.net"
+    "url": "wss://youtubedownload.psanetwork.com"
   },
   {
     "name": "uu",
@@ -14,5 +14,9 @@
   {
     "name": "sukru",
     "url": "wss://yt.sukru.top/"
+  },  
+  {
+    "name": "(Local)",
+    "url": "ws://localhost:3020"
   }
 ]
