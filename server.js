@@ -21,7 +21,7 @@ const RESERVED_SPACE_GB = parseFloat(process.env.RESERVED_SPACE_GB) || 5;
 
 // セキュリティ設定
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 100; // 緩和
+const RATE_LIMIT_MAX_REQUESTS = 1500; // 緩和
 const WS_RATE_LIMIT_WINDOW_MS = 10 * 1000;
 const WS_RATE_LIMIT_MAX_MESSAGES = 20;
 const requestCounts = new Map();
