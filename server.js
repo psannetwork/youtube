@@ -13,7 +13,7 @@ const urlList = require('./public/url_list.json');
 
 const app = express();
 const port = 3020;
-const wss = new WebSocket.Server({ noServer: true, maxPayload: 10 * 1024 });
+const wss = new WebSocket.Server({ noServer: true, maxPayload: 1024 * 1024 });
 
 // Worker設定（環境変数で調整可能、デフォルトは2）
 const MAX_CONCURRENT_DOWNLOADS = parseInt(process.env.MAX_WORKERS) || 2;
@@ -52,7 +52,7 @@ app.use(helmet({
       "script-src": ["'self'", "'unsafe-inline'", "https:"],
       "script-src-attr": ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      "connect-src": ["'self'", 'ws:', 'wss:', 'http:', 'https:'],
+      "connect-src": ["'self'", 'ws:', 'wss:', 'http:', 'https:', ...allowedWsDomains],
       imgSrc: ["'self'", 'data:', 'https:', 'http:'],
       mediaSrc: ["'self'"],
       fontSrc: ["'self'"],
@@ -67,7 +67,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   dnsPrefetchControl: { allow: false },
   frameguard: { action: "deny" },
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  hsts: false,
   ieNoOpen: true,
   noSniff: true,
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
@@ -831,12 +831,17 @@ app.get('/fetch-channel-playlists', async (req, res) => {
 });
 
 const server = app.listen(port, () => {
-  console.log(`Secure Server is running on http://localhost:${port}`);
+  console.log(`Server is running on http://localhost:${port}`);
 });
 
 // WebSocket upgradeハンドラ（originチェック無効化）
 server.on('upgrade', (req, socket, head) => {
+  console.log('🔍 WebSocket upgrade request received!');
+  console.log('   URL:', req.url);
+  console.log('   Headers:', req.headers);
+
   wss.handleUpgrade(req, socket, head, (ws) => {
+    console.log('✅ WebSocket connection accepted!');
     wss.emit('connection', ws, req);
   });
 });
