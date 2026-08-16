@@ -29,7 +29,10 @@ yarn-error.log*
 cookies.txt
 cookie.txt
 /tmp
+youtube-app.service
 
 # yt-dlp
 /usr/local/bin/yt-dlp
 /usr/bin/yt-dlp
+cookie.txt
+yt-dlp-bin

@@ -532,13 +532,14 @@ function extractVideoId(url) {
 function getVideoInfo(url) {
   return new Promise((resolve, reject) => {
     const args = [
+      '--js-runtimes', 'node',
       '--dump-json',
       '--no-playlist',
       '--no-download',
       url
     ];
 
-    const child = spawn('yt-dlp', args);
+    const child = spawn('./yt-dlp-bin', args);
     let output = '';
     let errorOutput = '';
 
@@ -548,6 +549,7 @@ function getVideoInfo(url) {
 
     child.stderr.on('data', (data) => {
       errorOutput += data.toString();
+      console.error('yt-dlp stderr (getVideoInfo):', data.toString());
     });
 
     child.on('close', (code) => {
@@ -565,14 +567,17 @@ function getVideoInfo(url) {
             uploadDate: info.upload_date
           });
         } catch (e) {
+          console.error('JSONパースエラー (getVideoInfo):', e.message, 'Output:', output);
           reject(new Error('JSONパースエラー'));
         }
       } else {
+        console.error('yt-dlp failed (getVideoInfo) with code:', code, 'stderr:', errorOutput);
         reject(new Error(errorOutput || '動画情報の取得に失敗'));
       }
     });
 
     child.on('error', (err) => {
+      console.error('yt-dlp spawn error (getVideoInfo):', err);
       reject(err);
     });
   });
@@ -590,6 +595,7 @@ function startDownload(requestId, url, format, ws) {
 
   const formatArgs = getFormatArgs(format);
   const args = [
+    '--js-runtimes', 'node',
     '--no-playlist',
     ...formatArgs.ytDlpFormat,
     '-o', `${randomDir}/%(title)s.%(ext)s`,
@@ -616,7 +622,7 @@ function startDownload(requestId, url, format, ws) {
     }
   }
 
-  const child = spawn('yt-dlp', args, { detached: true });
+  const child = spawn('./yt-dlp-bin', args, { detached: true });
 
   activeDownloads.set(requestId, { child, randomDir, stopped: false });
 

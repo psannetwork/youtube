@@ -10,12 +10,13 @@ const fetchPlaylist = async (playlistId) => {
         }
 
         const args = [
+            '--js-runtimes', 'node',
             '--flat-playlist',
             '--print', `%(id)s${SEPARATOR}%(title)s${SEPARATOR}%(url)s`,
             `https://www.youtube.com/playlist?list=${playlistId}`
         ];
 
-        const child = spawn('yt-dlp', args);
+        const child = spawn('./yt-dlp-bin', args);
         let output = '';
         let errorOutput = '';
 
@@ -59,12 +60,13 @@ const fetchPlaylist = async (playlistId) => {
 const fetchChannelPlaylists = async (channelUrl) => {
     return new Promise((resolve, reject) => {
         const args = [
+            '--js-runtimes', 'node',
             '--flat-playlist',
             '--print', `%(id)s${SEPARATOR}%(title)s${SEPARATOR}%(url)s`,
             channelUrl
         ];
 
-        const child = spawn('yt-dlp', args);
+        const child = spawn('./yt-dlp-bin', args);
         let output = '';
         let errorOutput = '';
 
